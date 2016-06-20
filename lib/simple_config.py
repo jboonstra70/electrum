@@ -80,7 +80,7 @@ class SimpleConfig(PrintError):
         if not os.path.exists(path):
             if os.path.islink(path):
                 raise BaseException('Dangling link: ' + path)
-            os.mkdir(path)
+            os.makedirs(path)
 
         print_error("electrum directory", path)
         return path
