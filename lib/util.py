@@ -211,7 +211,7 @@ def android_ext_dir():
 def android_data_dir():
     import jnius
     PythonActivity = jnius.autoclass('org.renpy.android.PythonActivity')
-    return PythonActivity.mActivity.getFilesDir().getPath() + '/data'
+    return PythonActivity.mActivity.getFilesDir().getPath() + '/data/auroracoin'
 
 def android_headers_path():
     path = android_ext_dir() + '/org.electrum.electrum/blockchain_headers'
@@ -224,7 +224,7 @@ def android_check_data_dir():
     """ if needed, move old directory to sandbox """
     ext_dir = android_ext_dir()
     data_dir = android_data_dir()
-    old_electrum_dir = ext_dir + '/electrum'
+    old_electrum_dir = ext_dir + '/electrum/auroracoin'
     if not os.path.exists(data_dir) and os.path.exists(old_electrum_dir):
         import shutil
         new_headers_path = android_headers_path()
@@ -244,11 +244,11 @@ def get_headers_path(config):
 
 def user_dir():
     if "HOME" in os.environ:
-        return os.path.join(os.environ["HOME"], ".electrum")
+        return os.path.join(os.environ["HOME"], ".electrum", "auroracoin")
     elif "APPDATA" in os.environ:
-        return os.path.join(os.environ["APPDATA"], "Electrum")
+        return os.path.join(os.environ["APPDATA"], "Electrum", "auroracoin")
     elif "LOCALAPPDATA" in os.environ:
-        return os.path.join(os.environ["LOCALAPPDATA"], "Electrum")
+        return os.path.join(os.environ["LOCALAPPDATA"], "Electrum", "auroracoin")
     elif 'ANDROID_DATA' in os.environ:
         return android_check_data_dir()
     else:
@@ -348,32 +348,32 @@ def time_difference(distance_in_time, include_seconds):
         return "over %d years" % (round(distance_in_minutes / 525600))
 
 block_explorer_info = {
-    'Biteasy.com': ('https://www.biteasy.com/blockchain',
-                        {'tx': 'transactions', 'addr': 'addresses'}),
-    'Bitflyer.jp': ('https://chainflyer.bitflyer.jp',
-                        {'tx': 'Transaction', 'addr': 'Address'}),
-    'Blockchain.info': ('https://blockchain.info',
-                        {'tx': 'tx', 'addr': 'address'}),
-    'blockchainbdgpzk.onion': ('https://blockchainbdgpzk.onion',
-                        {'tx': 'tx', 'addr': 'address'}),
-    'Blockr.io': ('https://btc.blockr.io',
-                        {'tx': 'tx/info', 'addr': 'address/info'}),
-    'Blocktrail.com': ('https://www.blocktrail.com/BTC',
-                        {'tx': 'tx', 'addr': 'address'}),
-    'BTC.com': ('https://chain.btc.com',
-                        {'tx': 'tx', 'addr': 'address'}),
-    'Chain.so': ('https://www.chain.so',
-                        {'tx': 'tx/BTC', 'addr': 'address/BTC'}),
-    'Insight.is': ('https://insight.bitpay.com',
-                        {'tx': 'tx', 'addr': 'address'}),
-    'TradeBlock.com': ('https://tradeblock.com/blockchain',
-                        {'tx': 'tx', 'addr': 'address'}),
+#     'Biteasy.com': ('https://www.biteasy.com/blockchain',
+#                         {'tx': 'transactions', 'addr': 'addresses'}),
+#     'Bitflyer.jp': ('https://chainflyer.bitflyer.jp',
+#                         {'tx': 'Transaction', 'addr': 'Address'}),
+#     'Blockchain.info': ('https://blockchain.info',
+#                         {'tx': 'tx', 'addr': 'address'}),
+#     'blockchainbdgpzk.onion': ('https://blockchainbdgpzk.onion',
+#                         {'tx': 'tx', 'addr': 'address'}),
+#     'Blockr.io': ('https://btc.blockr.io',
+#                         {'tx': 'tx/info', 'addr': 'address/info'}),
+#     'Blocktrail.com': ('https://www.blocktrail.com/BTC',
+#                         {'tx': 'tx', 'addr': 'address'}),
+#     'BTC.com': ('https://chain.btc.com',
+#                         {'tx': 'tx', 'addr': 'address'}),
+#     'Chain.so': ('https://www.chain.so',
+#                         {'tx': 'tx/BTC', 'addr': 'address/BTC'}),
+#     'Insight.is': ('https://insight.bitpay.com',
+#                         {'tx': 'tx', 'addr': 'address'}),
+#     'TradeBlock.com': ('https://tradeblock.com/blockchain',
+#                         {'tx': 'tx', 'addr': 'address'}),
     'system default': ('blockchain:',
                         {'tx': 'tx', 'addr': 'address'}),
 }
 
 def block_explorer(config):
-    return config.get('block_explorer', 'Blockchain.info')
+    return config.get('block_explorer', 'system default')
 
 def block_explorer_tuple(config):
     return block_explorer_info.get(block_explorer(config))

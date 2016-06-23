@@ -29,14 +29,15 @@ import os
 import util
 from bitcoin import *
 
-MAX_TARGET = 0x00000000FFFF0000000000000000000000000000000000000000000000000000
+MAX_TARGET = 0x00000FFFFF000000000000000000000000000000000000000000000000000000
+POW_LIMIT = 0x1e0fffff 
 
 class Blockchain(util.PrintError):
     '''Manages blockchain headers and their verification'''
     def __init__(self, config, network):
         self.config = config
         self.network = network
-        self.headers_url = "https://headers.electrum.org/blockchain_headers"
+        self.headers_url = "" # "https://headers.electrum.org/blockchain_headers"
         self.local_height = 0
         self.set_local_height()
 
@@ -53,7 +54,7 @@ class Blockchain(util.PrintError):
         assert prev_hash == header.get('prev_block_hash'), "prev hash mismatch: %s vs %s" % (prev_hash, header.get('prev_block_hash'))
         assert bits == header.get('bits'), "bits mismatch: %s vs %s" % (bits, header.get('bits'))
         _hash = self.hash_header(header)
-        assert int('0x' + _hash, 16) <= target, "insufficient proof of work: %s vs target %s" % (int('0x' + _hash, 16), target)
+        assert int('0x' + _hash, 16) <= target, "insufficient proof of work: %s vs target %s \n%s" % (int('0x' + _hash, 16), target, '0x' + _hash)
 
     def verify_chain(self, chain):
         first_header = chain[0]
@@ -157,7 +158,7 @@ class Blockchain(util.PrintError):
 
     def get_target(self, index, chain=None):
         if index == 0:
-            return 0x1d00ffff, MAX_TARGET
+            return POW_LIMIT, MAX_TARGET
         first = self.read_header((index-1) * 2016)
         last = self.read_header(index*2016 - 1)
         if last is None:

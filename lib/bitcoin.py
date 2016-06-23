@@ -47,6 +47,9 @@ TYPE_ADDRESS = 0
 TYPE_PUBKEY  = 1
 TYPE_SCRIPT  = 2
 
+# base58 prefixes
+B58_PRFX_PUBKEY_ADDRESS = 23
+B58_PRFX_SCRIPT_ADDRESS = 5
 
 # AES encryption
 EncodeAES = lambda secret, s: base64.b64encode(aes.encryptData(secret,s))
@@ -216,7 +219,7 @@ def public_key_to_bc_address(public_key):
     h160 = hash_160(public_key)
     return hash_160_to_bc_address(h160)
 
-def hash_160_to_bc_address(h160, addrtype = 0):
+def hash_160_to_bc_address(h160, addrtype = B58_PRFX_PUBKEY_ADDRESS ):
     vh160 = chr(addrtype) + h160
     h = Hash(vh160)
     addr = vh160 + h[0:4]
@@ -366,7 +369,7 @@ def is_address(addr):
         addrtype, h = bc_address_to_hash_160(addr)
     except Exception:
         return False
-    if addrtype not in [0, 5]:
+    if addrtype not in [B58_PRFX_PUBKEY_ADDRESS , B58_PRFX_SCRIPT_ADDRESS]:
         return False
     return addr == hash_160_to_bc_address(h, addrtype)
 
