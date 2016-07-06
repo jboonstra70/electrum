@@ -1,5 +1,5 @@
 Popup:
-    title: "Electrum"
+    title: "Electrum-LTC"
     confirmed: 0
     unconfirmed: 0
     unmatured: 0
@@ -49,7 +49,7 @@ Popup:
                 TopLabel:
                     text: _('Master Public Key')
                 RefLabel:
-                    data: app.wallet.get_master_public_key()
+                    data: app.wallet.get_master_public_key() or 'None'
                     name: _('Master Public Key')
                 TopLabel:
                     id: seed_label

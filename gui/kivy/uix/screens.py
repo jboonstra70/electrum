@@ -17,16 +17,16 @@ from kivy.lang import Builder
 from kivy.factory import Factory
 from kivy.utils import platform
 
-from electrum.util import profiler, parse_URI, format_time, InvalidPassword, NotEnoughFunds
-from electrum import bitcoin
-from electrum.util import timestamp_to_datetime
-from electrum.plugins import run_hook
-from electrum.paymentrequest import PR_UNPAID, PR_PAID, PR_UNKNOWN, PR_EXPIRED
+from electrum_ltc.util import profiler, parse_URI, format_time, InvalidPassword, NotEnoughFunds
+from electrum_ltc import bitcoin
+from electrum_ltc.util import timestamp_to_datetime
+from electrum_ltc.plugins import run_hook
+from electrum_ltc.paymentrequest import PR_UNPAID, PR_PAID, PR_UNKNOWN, PR_EXPIRED
 
 from context_menu import ContextMenu
 
 
-from electrum_gui.kivy.i18n import _
+from electrum_ltc_gui.kivy.i18n import _
 
 class EmptyLabel(Factory.Label):
     pass
@@ -177,11 +177,11 @@ class SendScreen(CScreen):
     payment_request = None
 
     def set_URI(self, text):
-        import electrum
+        import electrum_ltc as electrum
         try:
             uri = electrum.util.parse_URI(text, self.app.on_pr)
         except:
-            self.app.show_info(_("Not a Bitcoin URI"))
+            self.app.show_info(_("Not a Litecoin URI"))
             return
         amount = uri.get('amount')
         self.screen.address = uri.get('address', '')
@@ -219,7 +219,7 @@ class SendScreen(CScreen):
             # it sould be already saved
             return
         # save address as invoice
-        from electrum.paymentrequest import make_unsigned_request, PaymentRequest
+        from electrum_ltc.paymentrequest import make_unsigned_request, PaymentRequest
         req = {'address':self.screen.address, 'memo':self.screen.message}
         amount = self.app.get_amount(self.screen.amount) if self.screen.amount else 0
         req['amount'] = amount
@@ -251,10 +251,10 @@ class SendScreen(CScreen):
         else:
             address = str(self.screen.address)
             if not address:
-                self.app.show_error(_('Recipient not specified.') + ' ' + _('Please scan a Bitcoin address or a payment request'))
+                self.app.show_error(_('Recipient not specified.') + ' ' + _('Please scan a Litecoin address or a payment request'))
                 return
             if not bitcoin.is_address(address):
-                self.app.show_error(_('Invalid Bitcoin Address') + ':\n' + address)
+                self.app.show_error(_('Invalid Litecoin Address') + ':\n' + address)
                 return
             try:
                 amount = self.app.get_amount(self.screen.amount)
@@ -283,7 +283,7 @@ class SendScreen(CScreen):
             _("Amount to be sent") + ": " + self.app.format_amount_and_units(amount),
             _("Mining fee") + ": " + self.app.format_amount_and_units(fee),
         ]
-        if fee >= config.get('confirm_fee', 100000):
+        if fee >= config.get('confirm_fee', 1000000):
             msg.append(_('Warning')+ ': ' + _("The fee for this transaction seems unusually high."))
         msg.append(_("Enter your PIN code to proceed"))
         self.app.protected('\n'.join(msg), self.send_tx, (tx, message))
@@ -342,7 +342,7 @@ class ReceiveScreen(CScreen):
         Clock.schedule_once(lambda dt: self.update_qr())
 
     def get_URI(self):
-        from electrum.util import create_URI
+        from electrum_ltc.util import create_URI
         amount = self.screen.amount
         if amount:
             a, u = self.screen.amount.split()
@@ -358,7 +358,7 @@ class ReceiveScreen(CScreen):
 
     def do_share(self):
         uri = self.get_URI()
-        self.app.do_share(uri, _("Share Bitcoin Request"))
+        self.app.do_share(uri, _("Share Litecoin Request"))
 
     def do_copy(self):
         uri = self.get_URI()

@@ -35,7 +35,7 @@ import urllib
 import threading
 from i18n import _
 
-base_units = {'BTC':8, 'mBTC':5, 'uBTC':2}
+base_units = {'LTC':8, 'mLTC':5, 'uLTC':2}
 fee_levels = [_('Within 25 blocks'), _('Within 10 blocks'), _('Within 5 blocks'), _('Within 2 blocks'), _('In the next block')]
 
 def normalize_version(v):
@@ -214,7 +214,7 @@ def android_data_dir():
     return PythonActivity.mActivity.getFilesDir().getPath() + '/data/auroracoin'
 
 def android_headers_path():
-    path = android_ext_dir() + '/org.electrum.electrum/blockchain_headers'
+    path = android_ext_dir() + '/org.electrum_ltc.electrum_ltc/blockchain_headers'
     d = os.path.dirname(path)
     if not os.path.exists(d):
         os.mkdir(d)
@@ -398,12 +398,12 @@ def parse_URI(uri, on_pr=None):
 
     if ':' not in uri:
         if not bitcoin.is_address(uri):
-            raise BaseException("Not a bitcoin address")
+            raise BaseException("Not a litecoin address")
         return {'address': uri}
 
     u = urlparse.urlparse(uri)
-    if u.scheme != 'bitcoin':
-        raise BaseException("Not a bitcoin URI")
+    if u.scheme != 'litecoin':
+        raise BaseException("Not a litecoin URI")
     address = u.path
 
     # python for android fails to parse query
@@ -420,7 +420,7 @@ def parse_URI(uri, on_pr=None):
     out = {k: v[0] for k, v in pq.items()}
     if address:
         if not bitcoin.is_address(address):
-            raise BaseException("Invalid bitcoin address:" + address)
+            raise BaseException("Invalid litecoin address:" + address)
         out['address'] = address
     if 'amount' in out:
         am = out['amount']
@@ -471,7 +471,7 @@ def create_URI(addr, amount, message):
         if type(message) == unicode:
             message = message.encode('utf8')
         query.append('message=%s'%urllib.quote(message))
-    p = urlparse.ParseResult(scheme='bitcoin', netloc='', path=addr, params='', query='&'.join(query), fragment='')
+    p = urlparse.ParseResult(scheme='litecoin', netloc='', path=addr, params='', query='&'.join(query), fragment='')
     return urlparse.urlunparse(p)
 
 

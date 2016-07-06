@@ -27,10 +27,10 @@
 import webbrowser
 
 from util import *
-from electrum.i18n import _
-from electrum.util import block_explorer_URL, format_satoshis, format_time
-from electrum.plugins import run_hook
-from electrum.bitcoin import is_address
+from electrum_ltc.i18n import _
+from electrum_ltc.util import block_explorer_URL, format_satoshis, format_time
+from electrum_ltc.plugins import run_hook
+from electrum_ltc.bitcoin import is_address
 
 
 class AddressList(MyTreeWidget):
@@ -41,6 +41,7 @@ class AddressList(MyTreeWidget):
 
     def on_update(self):
         self.wallet = self.parent.wallet
+        self.accounts_expanded = self.wallet.storage.get('accounts_expanded', {})
         item = self.currentItem()
         current_address = item.data(0, Qt.UserRole).toString() if item else None
         self.clear()
@@ -54,9 +55,9 @@ class AddressList(MyTreeWidget):
                 name = self.wallet.get_account_name(k)
                 c, u, x = self.wallet.get_account_balance(k)
                 account_item = QTreeWidgetItem([ name, '', self.parent.format_amount(c + u + x), ''])
-                account_item.setExpanded(self.accounts_expanded.get(k, True))
                 account_item.setData(0, Qt.UserRole, k)
                 self.addTopLevelItem(account_item)
+                account_item.setExpanded(self.accounts_expanded.get(k, True))
             else:
                 account_item = self
             sequences = [0,1] if account.has_change() else [0]
@@ -106,7 +107,7 @@ class AddressList(MyTreeWidget):
                         address_item.addChild(utxo_item)
 
     def create_menu(self, position):
-        from electrum.wallet import Multisig_Wallet
+        from electrum_ltc.wallet import Multisig_Wallet
         is_multisig = isinstance(self.wallet, Multisig_Wallet)
         selected = self.selectedItems()
         multi_select = len(selected) > 1
@@ -172,3 +173,6 @@ class AddressList(MyTreeWidget):
     def set_account_expanded(self, item, k, b):
         item.setExpanded(b)
         self.accounts_expanded[k] = b
+
+    def on_close(self):
+        self.wallet.storage.put('accounts_expanded', self.accounts_expanded)

@@ -1,10 +1,10 @@
 from decimal import Decimal
 _ = lambda x:x
 #from i18n import _
-from electrum.wallet import WalletStorage, Wallet
-from electrum.util import format_satoshis, set_verbosity, StoreDict
-from electrum.bitcoin import is_valid, COIN, TYPE_ADDRESS
-from electrum.network import filter_protocol
+from electrum_ltc.wallet import WalletStorage, Wallet
+from electrum_ltc.util import format_satoshis, set_verbosity, StoreDict
+from electrum_ltc.bitcoin import is_valid, COIN, TYPE_ADDRESS
+from electrum_ltc.network import filter_protocol
 import sys, getpass, datetime
 
 # minimal fdisk like gui for console usage
@@ -17,7 +17,7 @@ class ElectrumGui:
         self.network = daemon.network
         storage = WalletStorage(config.get_wallet_path())
         if not storage.file_exists:
-            print "Wallet not found. try 'electrum create'"
+            print "Wallet not found. try 'electrum-ltc create'"
             exit()
 
         self.done = 0
@@ -161,7 +161,7 @@ class ElectrumGui:
 
     def do_send(self):
         if not is_valid(self.str_recipient):
-            print(_('Invalid Bitcoin address'))
+            print(_('Invalid Litecoin address'))
             return
         try:
             amount = int(Decimal(self.str_amount) * COIN)
@@ -206,12 +206,12 @@ class ElectrumGui:
             print(_('Error'))
 
     def network_dialog(self):
-        print("use 'electrum setconfig server/proxy' to change your network settings")
+        print("use 'electrum-ltc setconfig server/proxy' to change your network settings")
         return True
 
 
     def settings_dialog(self):
-        print("use 'electrum setconfig' to change your settings")
+        print("use 'electrum-ltc setconfig' to change your settings")
         return True
 
     def password_dialog(self):

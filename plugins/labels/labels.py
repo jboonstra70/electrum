@@ -8,9 +8,9 @@ import traceback
 import aes
 import base64
 
-import electrum
-from electrum.plugins import BasePlugin, hook
-from electrum.i18n import _
+import electrum_ltc as electrum
+from electrum_ltc.plugins import BasePlugin, hook
+from electrum_ltc.i18n import _
 
 
 

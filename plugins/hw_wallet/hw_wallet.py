@@ -26,7 +26,7 @@
 
 from struct import pack
 
-from electrum.wallet import BIP44_Wallet
+from electrum_ltc.wallet import BIP44_Wallet
 
 class BIP44_HW_Wallet(BIP44_Wallet):
     '''A BIP44 hardware wallet base class.'''

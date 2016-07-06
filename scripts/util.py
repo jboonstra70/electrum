@@ -1,6 +1,6 @@
-import select, time, electrum, Queue
-from electrum import Connection, Interface, SimpleConfig
-from electrum.network import filter_protocol, parse_servers
+import select, time, electrum_ltc as electrum, Queue
+from electrum_ltc import Connection, Interface, SimpleConfig
+from electrum_ltc.network import filter_protocol, parse_servers
 from collections import defaultdict
 
 # electrum.util.set_verbosity(1)
@@ -47,7 +47,7 @@ def wait_on_interfaces(interfaces, timeout=10):
 def get_peers():
     peers = []
     # 1. get connected interfaces
-    server = 'ecdsa.net:110:s'
+    server = 'electrum-ltc.bysh.me:50002:s'
     interfaces = get_interfaces([server])
     if not interfaces:
         print "No connection to", server

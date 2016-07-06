@@ -43,9 +43,9 @@ class Plugins(DaemonThread):
         DaemonThread.__init__(self)
         if is_local:
             find = imp.find_module('plugins')
-            plugins = imp.load_module('electrum_plugins', *find)
+            plugins = imp.load_module('electrum_ltc_plugins', *find)
         else:
-            plugins = __import__('electrum_plugins')
+            plugins = __import__('electrum_ltc_plugins')
         self.pkgpath = os.path.dirname(plugins.__file__)
         self.config = config
         self.hw_wallets = {}
@@ -62,14 +62,11 @@ class Plugins(DaemonThread):
             m = loader.find_module(name).load_module(name)
             d = m.__dict__
             gui_good = self.gui_name in d.get('available_for', [])
-            # We register wallet types even if the GUI isn't provided
-            # otherwise the user gets a misleading message like
-            # "Unknown wallet type: 2fa"
+            if not gui_good:
+                continue
             details = d.get('registers_wallet_type')
             if details:
                 self.register_plugin_wallet(name, gui_good, details)
-            if not gui_good:
-                continue
             self.descriptions[name] = d
             if not d.get('requires_wallet_type') and self.config.get('use_' + name):
                 try:
@@ -86,7 +83,7 @@ class Plugins(DaemonThread):
         return len(self.plugins)
 
     def load_plugin(self, name):
-        full_name = 'electrum_plugins.' + name + '.' + self.gui_name
+        full_name = 'electrum_ltc_plugins.' + name + '.' + self.gui_name
         loader = pkgutil.find_loader(full_name)
         if not loader:
             raise RuntimeError("%s implementation for %s plugin not found"
@@ -426,9 +423,9 @@ class DeviceMgr(ThreadJob, PrintError):
         # or it is not pairable
         raise DeviceUnpairableError(
             _('Electrum cannot pair with your %s.\n\n'
-              'Before you request bitcoins to be sent to addresses in this '
+              'Before you request litecoins to be sent to addresses in this '
               'wallet, ensure you can pair with your device, or that you have '
-              'its seed (and passphrase, if any).  Otherwise all bitcoins you '
+              'its seed (and passphrase, if any).  Otherwise all litecoins you '
               'receive will be unspendable.') % plugin.device)
 
     def unpaired_device_infos(self, handler, plugin, devices=None):

@@ -37,8 +37,10 @@ import aes
 
 ################################## transactions
 
+DUST_SOFT_LIMIT = 100000
+MIN_RELAY_TX_FEE = 100000
 FEE_STEP = 10000
-RECOMMENDED_FEE = 50000
+RECOMMENDED_FEE = 100000
 COINBASE_MATURITY = 100
 COIN = 100000000
 
@@ -307,12 +309,12 @@ def PrivKeyToSecret(privkey):
     return privkey[9:9+32]
 
 
-def SecretToASecret(secret, compressed=False, addrtype=0):
+def SecretToASecret(secret, compressed=False, addrtype=B58_PRFX_PUBKEY_ADDRESS):
     vchIn = chr((addrtype+128)&255) + secret
     if compressed: vchIn += '\01'
     return EncodeBase58Check(vchIn)
 
-def ASecretToSecret(key, addrtype=0):
+def ASecretToSecret(key, addrtype=B58_PRFX_PUBKEY_ADDRESS):
     vch = DecodeBase58Check(key)
     if vch and vch[0] == chr((addrtype+128)&255):
         return vch[1:]
@@ -405,7 +407,7 @@ from ecdsa.util import string_to_number, number_to_string
 def msg_magic(message):
     varint = var_int(len(message))
     encoded_varint = "".join([chr(int(varint[i:i+2], 16)) for i in xrange(0, len(varint), 2)])
-    return "\x18Bitcoin Signed Message:\n" + encoded_varint + message
+    return "\x19Litecoin Signed Message:\n" + encoded_varint + message
 
 
 def verify_message(address, signature, message):
@@ -681,6 +683,15 @@ TESTNET_HEADER_PUB = "043587cf"
 BITCOIN_HEADERS = (BITCOIN_HEADER_PUB, BITCOIN_HEADER_PRIV)
 TESTNET_HEADERS = (TESTNET_HEADER_PUB, TESTNET_HEADER_PRIV)
 
+BITCOIN_HEADER_ALT_PRIV = "019d9cfe"
+BITCOIN_HEADER_ALT_PUB = "019da462"
+
+TESTNET_HEADER_ALT_PRIV = "0436ef7d"
+TESTNET_HEADER_ALT_PUB = "0436f6e1"
+
+BITCOIN_HEADERS_ALT = (BITCOIN_HEADER_ALT_PUB, BITCOIN_HEADER_ALT_PRIV)
+TESTNET_HEADERS_ALT = (TESTNET_HEADER_ALT_PUB, TESTNET_HEADER_ALT_PRIV)
+
 def _get_headers(testnet):
     """Returns the correct headers for either testnet or bitcoin, in the form
     of a 2-tuple, like (public, private)."""
@@ -701,6 +712,10 @@ def deserialize_xkey(xkey):
         head = TESTNET_HEADER_PRIV
     elif xkey_header in BITCOIN_HEADERS:
         head = BITCOIN_HEADER_PRIV
+    elif xkey_header in TESTNET_HEADERS_ALT:
+        head = TESTNET_HEADER_ALT_PRIV
+    elif xkey_header in BITCOIN_HEADERS_ALT:
+        head = BITCOIN_HEADER_ALT_PRIV
     else:
         raise Exception("Unknown xkey header: '%s'" % xkey_header)
 

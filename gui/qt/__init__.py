@@ -36,15 +36,15 @@ from PyQt4.QtGui import *
 from PyQt4.QtCore import *
 import PyQt4.QtCore as QtCore
 
-from electrum.i18n import _, set_language
-from electrum.plugins import run_hook
-from electrum import SimpleConfig, Wallet, WalletStorage
-from electrum.paymentrequest import InvoiceStore
-from electrum.contacts import Contacts
-from electrum.synchronizer import Synchronizer
-from electrum.verifier import SPV
-from electrum.util import DebugMem
-from electrum.wallet import Abstract_Wallet
+from electrum_ltc.i18n import _, set_language
+from electrum_ltc.plugins import run_hook
+from electrum_ltc import SimpleConfig, Wallet, WalletStorage
+from electrum_ltc.paymentrequest import InvoiceStore
+from electrum_ltc.contacts import Contacts
+from electrum_ltc.synchronizer import Synchronizer
+from electrum_ltc.verifier import SPV
+from electrum_ltc.util import DebugMem
+from electrum_ltc.wallet import Abstract_Wallet
 from installwizard import InstallWizard
 
 
@@ -93,7 +93,7 @@ class ElectrumGui:
         # init tray
         self.dark_icon = self.config.get("dark_icon", False)
         self.tray = QSystemTrayIcon(self.tray_icon(), None)
-        self.tray.setToolTip('Electrum')
+        self.tray.setToolTip('Electrum-LTC')
         self.tray.activated.connect(self.tray_activated)
         self.build_tray_menu()
         self.tray.show()
@@ -110,7 +110,7 @@ class ElectrumGui:
             submenu.addAction(_("Close"), window.close)
         m.addAction(_("Dark/Light"), self.toggle_tray_icon)
         m.addSeparator()
-        m.addAction(_("Exit Electrum"), self.close)
+        m.addAction(_("Exit Electrum-LTC"), self.close)
         self.tray.setContextMenu(m)
 
     def tray_icon(self):
@@ -149,9 +149,6 @@ class ElectrumGui:
         run_hook('on_new_window', w)
         return w
 
-    def get_wizard(self):
-        return InstallWizard(self.config, self.app, self.plugins)
-
     def start_new_window(self, path, uri):
         '''Raises the window for the wallet if it is open.  Otherwise
         opens the wallet and creates a new window for it.'''
@@ -160,14 +157,18 @@ class ElectrumGui:
                 w.bring_to_top()
                 break
         else:
-            wallet = self.daemon.load_wallet(path, self.get_wizard)
+            wallet = self.daemon.load_wallet(path)
             if not wallet:
-                return
+                wizard = InstallWizard(self.config, self.app, self.plugins, self.daemon.network, path)
+                wallet = wizard.run_and_get_wallet()
+                if not wallet:
+                    return
+                if wallet.get_action():
+                    return
+                self.daemon.add_wallet(wallet)
             w = self.create_window_for_wallet(wallet)
-
         if uri:
             w.pay_to_URI(uri)
-
         return w
 
     def close_window(self, window):

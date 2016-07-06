@@ -5,13 +5,13 @@ import threading
 from binascii import hexlify, unhexlify
 from functools import partial
 
-from electrum.account import BIP32_Account
-from electrum.bitcoin import (bc_address_to_hash_160, xpub_from_pubkey,
-                              public_key_to_bc_address, EncodeBase58Check,
-                              TYPE_ADDRESS)
-from electrum.i18n import _
-from electrum.plugins import BasePlugin, hook
-from electrum.transaction import (deserialize, is_extended_pubkey,
+from electrum_ltc.account import BIP32_Account
+from electrum_ltc.bitcoin import (bc_address_to_hash_160, xpub_from_pubkey,
+                                  public_key_to_bc_address, EncodeBase58Check,
+                                  TYPE_ADDRESS)
+from electrum_ltc.i18n import _
+from electrum_ltc.plugins import BasePlugin, hook
+from electrum_ltc.transaction import (deserialize, is_extended_pubkey,
                                   Transaction, x_to_xpub)
 from ..hw_wallet import BIP44_HW_Wallet, HW_PluginBase
 
@@ -46,7 +46,7 @@ class TrezorCompatibleWallet(BIP44_HW_Wallet):
         client = self.get_client()
         address_path = self.address_id(address)
         address_n = client.expand_path(address_path)
-        msg_sig = client.sign_message('Bitcoin', address_n, message)
+        msg_sig = client.sign_message('Litecoin', address_n, message)
         return msg_sig.signature
 
     def get_input_tx(self, tx_hash):
@@ -106,15 +106,19 @@ class TrezorCompatiblePlugin(HW_PluginBase):
             pair = [device.path, None]
 
         try:
-            return self.HidTransport(pair)
+            from trezorlib.transport_hid import HidTransport
+            return HidTransport(pair)
         except BaseException as e:
+            raise
             self.print_error("cannot connect at", device.path, str(e))
             return None
  
     def _try_bridge(self, device):
         self.print_error("Trying to connect over Trezor Bridge...")
+
         try:
-            return self.BridgeTransport({'path': hexlify(device.path)})
+            from trezorlib.transport_bridge import BridgeTransport
+            return BridgeTransport({'path': hexlify(device.path)})
         except BaseException as e:
             self.print_error("cannot connect to bridge", str(e))
             return None
@@ -235,7 +239,7 @@ class TrezorCompatiblePlugin(HW_PluginBase):
         client = self.get_client(wallet)
         inputs = self.tx_inputs(tx, True)
         outputs = self.tx_outputs(wallet, tx)
-        signed_tx = client.sign_tx('Bitcoin', inputs, outputs)[1]
+        signed_tx = client.sign_tx('Litecoin', inputs, outputs)[1]
         raw = signed_tx.encode('hex')
         tx.update_signatures(raw)
 
@@ -246,7 +250,7 @@ class TrezorCompatiblePlugin(HW_PluginBase):
             return
         address_path = wallet.address_id(address)
         address_n = client.expand_path(address_path)
-        client.get_address('Bitcoin', address_n, True)
+        client.get_address('Litecoin', address_n, True)
 
     def tx_inputs(self, tx, for_sig=False):
         inputs = []
@@ -322,7 +326,7 @@ class TrezorCompatiblePlugin(HW_PluginBase):
                 txoutputtype.address = address
             txoutputtype.amount = amount
             addrtype, hash_160 = bc_address_to_hash_160(address)
-            if addrtype == 0:
+            if addrtype == 48:
                 txoutputtype.script_type = self.types.PAYTOADDRESS
             elif addrtype == 5:
                 txoutputtype.script_type = self.types.PAYTOSCRIPTHASH

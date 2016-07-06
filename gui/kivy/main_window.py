@@ -7,16 +7,16 @@ import traceback
 from decimal import Decimal
 import threading
 
-import electrum
-from electrum.bitcoin import TYPE_ADDRESS
-from electrum import WalletStorage, Wallet
-from electrum_gui.kivy.i18n import _
-from electrum.contacts import Contacts
-from electrum.paymentrequest import InvoiceStore
-from electrum.util import profiler, InvalidPassword
-from electrum.plugins import run_hook
-from electrum.util import format_satoshis, format_satoshis_plain
-from electrum.paymentrequest import PR_UNPAID, PR_PAID, PR_UNKNOWN, PR_EXPIRED
+import electrum_ltc as electrum
+from electrum_ltc.bitcoin import TYPE_ADDRESS
+from electrum_ltc import WalletStorage, Wallet
+from electrum_ltc_gui.kivy.i18n import _
+from electrum_ltc.contacts import Contacts
+from electrum_ltc.paymentrequest import InvoiceStore
+from electrum_ltc.util import profiler, InvalidPassword
+from electrum_ltc.plugins import run_hook
+from electrum_ltc.util import format_satoshis, format_satoshis_plain
+from electrum_ltc.paymentrequest import PR_UNPAID, PR_PAID, PR_UNKNOWN, PR_EXPIRED
 
 from kivy.app import App
 from kivy.core.window import Window
@@ -32,10 +32,10 @@ from kivy.lang import Builder
 
 # lazy imports for factory so that widgets can be used in kv
 Factory.register('InstallWizard',
-                 module='electrum_gui.kivy.uix.dialogs.installwizard')
-Factory.register('InfoBubble', module='electrum_gui.kivy.uix.dialogs')
-Factory.register('OutputList', module='electrum_gui.kivy.uix.dialogs')
-Factory.register('OutputItem', module='electrum_gui.kivy.uix.dialogs')
+                 module='electrum_ltc_gui.kivy.uix.dialogs.installwizard')
+Factory.register('InfoBubble', module='electrum_ltc_gui.kivy.uix.dialogs')
+Factory.register('OutputList', module='electrum_ltc_gui.kivy.uix.dialogs')
+Factory.register('OutputItem', module='electrum_ltc_gui.kivy.uix.dialogs')
 
 
 #from kivy.core.window import Window
@@ -49,7 +49,7 @@ util = False
 
 # register widget cache for keeping memory down timeout to forever to cache
 # the data
-Cache.register('electrum_widgets', timeout=0)
+Cache.register('electrum_ltc_widgets', timeout=0)
 
 from kivy.uix.screenmanager import Screen
 from kivy.uix.tabbedpanel import TabbedPanel
@@ -58,7 +58,7 @@ from kivy.uix.checkbox import CheckBox
 from kivy.uix.switch import Switch
 from kivy.core.clipboard import Clipboard
 
-Factory.register('TabbedCarousel', module='electrum_gui.kivy.uix.screens')
+Factory.register('TabbedCarousel', module='electrum_ltc_gui.kivy.uix.screens')
 
 # Register fonts without this you won't be able to use bold/italic...
 # inside markup.
@@ -70,7 +70,7 @@ Label.register('Roboto',
                'gui/kivy/data/fonts/Roboto-Bold.ttf')
 
 
-from electrum.util import base_units
+from electrum_ltc.util import base_units
 
 
 class ElectrumWindow(App):
@@ -84,7 +84,7 @@ class ElectrumWindow(App):
         self.send_screen.set_URI(uri)
 
     def on_new_intent(self, intent):
-        if intent.getScheme() != 'bitcoin':
+        if intent.getScheme() != 'litecoin':
             return
         uri = intent.getDataString()
         self.set_URI(uri)
@@ -103,7 +103,7 @@ class ElectrumWindow(App):
             Clock.schedule_once(lambda dt: self.history_screen.update())
 
     def _get_bu(self):
-        return self.electrum_config.get('base_unit', 'mBTC')
+        return self.electrum_config.get('base_unit', 'LTC')
 
     def _set_bu(self, value):
         assert value in base_units.keys()
@@ -192,15 +192,15 @@ class ElectrumWindow(App):
 
         super(ElectrumWindow, self).__init__(**kwargs)
 
-        title = _('Electrum App')
+        title = _('Electrum-LTC App')
         self.electrum_config = config = kwargs.get('config', None)
         self.language = config.get('language', 'en')
         self.network = network = kwargs.get('network', None)
         self.plugins = kwargs.get('plugins', [])
 
         self.gui_object = kwargs.get('gui_object', None)
+        self.daemon = self.gui_object.daemon
 
-        #self.config = self.gui_object.config
         self.contacts = Contacts(self.electrum_config)
         self.invoices = InvoiceStore(self.electrum_config)
 
@@ -236,18 +236,20 @@ class ElectrumWindow(App):
             self.send_screen.do_clear()
 
     def on_qr(self, data):
-        from electrum.bitcoin import base_decode, is_address
+        from electrum_ltc.bitcoin import base_decode, is_address
+        data = data.strip()
         if is_address(data):
             self.set_URI(data)
             return
-        if data.startswith('bitcoin:'):
+        if data.startswith('litecoin:'):
             self.set_URI(data)
             return
         # try to decode transaction
-        from electrum.transaction import Transaction
+        from electrum_ltc.transaction import Transaction
         try:
             text = base_decode(data, None, base=43).encode('hex')
             tx = Transaction(text)
+            tx.deserialize()
         except:
             tx = None
         if tx:
@@ -280,7 +282,7 @@ class ElectrumWindow(App):
         self.receive_screen.screen.address = addr
 
     def show_pr_details(self, req, status, is_invoice):
-        from electrum.util import format_time
+        from electrum_ltc.util import format_time
         requestor = req.get('requestor')
         exp = req.get('exp')
         memo = req.get('memo')
@@ -408,36 +410,32 @@ class ElectrumWindow(App):
         else:
             return ''
 
-    def load_wallet_by_name(self, wallet_path):
-        if not wallet_path:
-            return
-        config = self.electrum_config
-        try:
-            storage = WalletStorage(wallet_path)
-        except IOError:
-            self.show_error("Cannot read wallet file")
-            return
-        if storage.file_exists:
-            wallet = Wallet(storage)
-            action = wallet.get_action()
-        else:
-            action = 'new'
-        if action is not None:
-            # start installation wizard
-            Logger.debug('Electrum: Wallet not found. Launching install wizard')
-            wizard = Factory.InstallWizard(config, self.network, storage)
-            wizard.bind(on_wizard_complete=lambda instance, wallet: self.load_wallet(wallet))
-            wizard.run(action)
-        else:
+    def on_wizard_complete(self, instance, wallet):
+        if wallet:
+            self.daemon.add_wallet(wallet)
             self.load_wallet(wallet)
         self.on_resume()
+
+    def load_wallet_by_name(self, path):
+        if not path:
+            return
+        wallet = self.daemon.load_wallet(path)
+        if wallet:
+            self.load_wallet(wallet)
+            self.on_resume()
+        else:
+            Logger.debug('Electrum: Wallet not found. Launching install wizard')
+            wizard = Factory.InstallWizard(self.electrum_config, self.network, path)
+            wizard.bind(on_wizard_complete=self.on_wizard_complete)
+            action = wizard.get_action()
+            wizard.run(action)
 
     def on_stop(self):
         self.stop_wallet()
 
     def stop_wallet(self):
         if self.wallet:
-            self.wallet.stop_threads()
+            self.daemon.stop_wallet(self.wallet.storage.path)
             self.wallet = None
 
     def on_key_down(self, instance, key, keycode, codepoint, modifiers):
@@ -500,13 +498,13 @@ class ElectrumWindow(App):
 
         #setup lazy imports for mainscreen
         Factory.register('AnimatedPopup',
-                         module='electrum_gui.kivy.uix.dialogs')
+                         module='electrum_ltc_gui.kivy.uix.dialogs')
         Factory.register('QRCodeWidget',
-                         module='electrum_gui.kivy.uix.qrcodewidget')
+                         module='electrum_ltc_gui.kivy.uix.qrcodewidget')
 
         # preload widgets. Remove this if you want to load the widgets on demand
-        #Cache.append('electrum_widgets', 'AnimatedPopup', Factory.AnimatedPopup())
-        #Cache.append('electrum_widgets', 'QRCodeWidget', Factory.QRCodeWidget())
+        #Cache.append('electrum_ltc_widgets', 'AnimatedPopup', Factory.AnimatedPopup())
+        #Cache.append('electrum_ltc_widgets', 'QRCodeWidget', Factory.QRCodeWidget())
 
         # load and focus the ui
         self.root.manager = self.root.ids['manager']
@@ -518,7 +516,7 @@ class ElectrumWindow(App):
         self.receive_screen = None
         self.requests_screen = None
 
-        self.icon = "icons/electrum.png"
+        self.icon = "icons/electrum-ltc.png"
 
         # connect callbacks
         if self.network:
@@ -539,9 +537,10 @@ class ElectrumWindow(App):
 
     @profiler
     def load_wallet(self, wallet):
+        print "load wallet", wallet.storage.path
+
         self.stop_wallet()
         self.wallet = wallet
-        self.wallet.start_threads(self.network)
         self.current_account = self.wallet.storage.get('current_account', None)
         self.update_wallet()
         # Once GUI has been initialized check if we want to announce something
@@ -556,20 +555,22 @@ class ElectrumWindow(App):
             self.status = _("No Wallet")
             return
         if self.network is None or not self.network.is_running():
-            self.status = _("Offline")
+            status = _("Offline")
         elif self.network.is_connected():
             server_height = self.network.get_server_height()
             server_lag = self.network.get_local_height() - server_height
             if not self.wallet.up_to_date or server_height == 0:
-                self.status = _("Synchronizing...")
+                status = _("Synchronizing...")
             elif server_lag > 1:
-                self.status = _("Server lagging (%d blocks)"%server_lag)
+                status = _("Server lagging (%d blocks)"%server_lag)
             else:
                 c, u, x = self.wallet.get_account_balance(self.current_account)
                 text = self.format_amount(c+x+u)
-                self.status = str(text.strip() + ' ' + self.base_unit)
+                status = str(text.strip() + ' ' + self.base_unit)
         else:
-            self.status = _("Not connected")
+            status = _("Not connected")
+        n = self.wallet.basename()
+        self.status = '[size=15dp]%s[/size]\n%s' %(n, status) if n !='default_wallet' else status
 
     def get_max_amount(self):
         inputs = self.wallet.get_spendable_coins(None)
@@ -596,8 +597,8 @@ class ElectrumWindow(App):
                 from plyer import notification
             icon = (os.path.dirname(os.path.realpath(__file__))
                     + '/../../' + self.icon)
-            notification.notify('Electrum', message,
-                            app_icon=icon, app_name='Electrum')
+            notification.notify('Electrum-LTC', message,
+                            app_icon=icon, app_name='Electrum-LTC')
         except ImportError:
             Logger.Error('Notification: needs plyer; `sudo pip install plyer`')
 

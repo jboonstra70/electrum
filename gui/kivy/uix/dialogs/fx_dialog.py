@@ -76,7 +76,7 @@ from kivy.uix.checkbox import CheckBox
 from kivy.uix.widget import Widget
 from kivy.clock import Clock
 
-from electrum.plugins import run_hook
+from electrum_ltc.plugins import run_hook
 from functools import partial
 
 class FxDialog(Factory.Popup):

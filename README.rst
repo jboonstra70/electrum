@@ -1,17 +1,14 @@
-Electrum - Lightweight Bitcoin client
-=====================================
+Electrum-LTC - Lightweight Litecoin client
+==========================================
 
 ::
 
   Licence: MIT Licence
-  Author: Thomas Voegtlin
+  Original Author: Thomas Voegtlin
+  Port Maintainer: Pooler
   Language: Python
-  Homepage: https://electrum.org/
+  Homepage: https://electrum-ltc.org/
 
-
-.. image:: https://travis-ci.org/spesmilo/electrum.svg?branch=master
-    :target: https://travis-ci.org/spesmilo/electrum
-    :alt: Build Status
 
 
 
@@ -30,7 +27,7 @@ Electrum from its root directory, without installing it on your
 system; all the python dependencies are included in the 'packages'
 directory. To run Electrum from its root directory, just do::
 
-    ./electrum
+    ./electrum-ltc
 
 If you cloned the git repository, then you need to compile extra files
 before you can run Electrum. Read the next section, "Development
@@ -43,8 +40,8 @@ Development version
 
 Check out the code from Github::
 
-    git clone git://github.com/spesmilo/electrum.git
-    cd electrum
+    git clone git://github.com/pooler/electrum-ltc.git
+    cd electrum-ltc
 
 Run install (this should install dependencies)::
 
@@ -76,7 +73,7 @@ directory.
 If you have pip, you can do::
 
     python setup.py sdist
-    sudo pip install --pre dist/Electrum-2.0.tar.gz
+    sudo pip install --pre dist/Electrum-LTC-2.0.tar.gz
 
 
 If you don't have pip, install with::
@@ -107,7 +104,7 @@ Mac OS X
     # On Homebrew installs: 
     ARCHFLAGS="-arch i386 -arch x86_64" sudo python setup-release.py py2app --includes sip
     
-    sudo hdiutil create -fs HFS+ -volname "Electrum" -srcfolder dist/Electrum.app dist/electrum-VERSION-macosx.dmg
+    sudo hdiutil create -fs HFS+ -volname "Electrum-LTC" -srcfolder dist/Electrum-LTC.app dist/electrum-ltc-VERSION-macosx.dmg
 
 Windows
 -------

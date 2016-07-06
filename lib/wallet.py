@@ -231,6 +231,9 @@ class Abstract_Wallet(PrintError):
         self.use_encryption = use_encryption
         self.storage.put('use_encryption', use_encryption)
 
+    def get_master_public_key(self):
+        pass
+
     @profiler
     def load_transactions(self):
         self.txi = self.storage.get('txi', {})
@@ -994,8 +997,8 @@ class Abstract_Wallet(PrintError):
         return status, status_str
 
     def relayfee(self):
-        RELAY_FEE = 5000
-        MAX_RELAY_FEE = 50000
+        RELAY_FEE = bitcoin.MIN_RELAY_TX_FEE
+        MAX_RELAY_FEE = 10 * RELAY_FEE
         f = self.network.relay_fee if self.network and self.network.relay_fee else RELAY_FEE
         return min(f, MAX_RELAY_FEE)
 
@@ -1008,7 +1011,7 @@ class Abstract_Wallet(PrintError):
         for type, data, value in outputs:
             if type == TYPE_ADDRESS:
                 if not is_address(data):
-                    raise BaseException("Invalid bitcoin address:" + data)
+                    raise BaseException("Invalid litecoin address:" + data)
 
         # Avoid index-out-of-range with coins[0] below
         if not coins:
@@ -1038,12 +1041,12 @@ class Abstract_Wallet(PrintError):
 
         # Fee estimator
         if fixed_fee is None:
-            fee_estimator = partial(self.estimate_fee, config)
+            fee_estimator = partial(self.estimate_fee, config, outputs=outputs)
         else:
             fee_estimator = lambda size: fixed_fee
 
         # Change <= dust threshold is added to the tx fee
-        dust_threshold = 182 * 3 * self.relayfee() / 1000
+        dust_threshold = DUST_SOFT_LIMIT
 
         # Let the coin chooser select the coins to spend
         max_change = self.max_change_outputs if self.multiple_change else 1
@@ -1057,8 +1060,11 @@ class Abstract_Wallet(PrintError):
         run_hook('make_unsigned_transaction', self, tx)
         return tx
 
-    def estimate_fee(self, config, size):
+    def estimate_fee(self, config, size, outputs=[]):
         fee = int(self.fee_per_kb(config) * size / 1000.)
+        for _, _, value in outputs:
+            if value < DUST_SOFT_LIMIT:
+                fee += DUST_SOFT_LIMIT
         return fee
 
     def mktx(self, outputs, password, config, fee=None, change_addr=None, domain=None):
@@ -1107,6 +1113,9 @@ class Abstract_Wallet(PrintError):
             tx.sign(keypairs)
 
     def update_password(self, old_password, new_password):
+        if old_password is not None:
+            self.check_password(old_password)
+
         if new_password == '':
             new_password = None
 
@@ -1372,7 +1381,7 @@ class Abstract_Wallet(PrintError):
         if not r:
             return
         out = copy.copy(r)
-        out['URI'] = 'bitcoin:' + addr + '?amount=' + util.format_satoshis(out.get('amount'))
+        out['URI'] = 'litecoin:' + addr + '?amount=' + util.format_satoshis(out.get('amount'))
         out['status'] = self.get_request_status(addr)
         # check if bip70 file exists
         rdir = config.get('requests_dir')
@@ -1833,7 +1842,7 @@ class BIP32_HD_Wallet(BIP32_RD_Wallet):
 
 
 class BIP44_Wallet(BIP32_HD_Wallet):
-    root_derivation = "m/44'/0'/"
+    root_derivation = "m/44'/2'/"
     wallet_type = 'bip44'
 
     @classmethod
@@ -1920,14 +1929,24 @@ class Multisig_Wallet(BIP32_RD_Wallet, Mnemonic):
             if self.master_public_keys.get("x%d/"%(i+1)) is None:
                 return i+1
 
-    def add_cosigner(self, xpub):
-        i = self.get_missing_cosigner()
-        self.add_master_public_key("x%d/" % i, xpub)
+    def add_cosigner(self, name, text, password):
+        if Wallet.is_xprv(text):
+            xpub = bitcoin.xpub_from_xprv(text)
+            self.add_master_public_key(name, xpub)
+            self.add_master_private_key(name, text, password)
+        elif Wallet.is_xpub(text):
+            self.add_master_public_key(name, text)
+        if Wallet.is_seed(text):
+            if name == 'x1/':
+                self.add_seed(text, password)
+                self.create_master_keys(password)
+            else:
+                self.add_xprv_from_seed(text, name, password)
 
     def get_action(self):
         i = self.get_missing_cosigner()
         if i is not None:
-            return 'create_seed' if i == 1 else 'add_cosigners'
+            return 'create_seed' if i == 1 else 'show_xpub_and_add_cosigners'
         if not self.accounts:
             return 'create_main_account'
 
@@ -2096,7 +2115,7 @@ class Wallet(object):
 
     @staticmethod
     def is_xpub(text):
-        if text[0:4] != 'xpub':
+        if text[0:4] not in ('xpub', 'Ltub'):
             return False
         try:
             deserialize_xkey(text)
@@ -2106,7 +2125,7 @@ class Wallet(object):
 
     @staticmethod
     def is_xprv(text):
-        if text[0:4] != 'xprv':
+        if text[0:4] not in ('xprv', 'Ltpv'):
             return False
         try:
             deserialize_xkey(text)
@@ -2189,30 +2208,6 @@ class Wallet(object):
         w = BIP32_Simple_Wallet(storage)
         w.create_xprv_wallet(xprv, password)
         return w
-
-    @staticmethod
-    def from_multisig(key_list, password, storage, wallet_type):
-        storage.put('wallet_type', wallet_type)
-        wallet = Multisig_Wallet(storage)
-        key_list = sorted(key_list, key = Wallet.is_xpub)
-        for i, text in enumerate(key_list):
-            name = "x%d/" % (i+1)
-            if Wallet.is_xprv(text):
-                xpub = bitcoin.xpub_from_xprv(text)
-                wallet.add_master_public_key(name, xpub)
-                wallet.add_master_private_key(name, text, password)
-            elif Wallet.is_xpub(text):
-                wallet.add_master_public_key(name, text)
-            elif Wallet.is_seed(text):
-                if name == 'x1/':
-                    wallet.add_seed(text, password)
-                    wallet.create_master_keys(password)
-                else:
-                    wallet.add_xprv_from_seed(text, name, password)
-            else:
-                raise RunTimeError("Cannot handle text for multisig")
-        wallet.set_use_encryption(password is not None)
-        return wallet
 
     @staticmethod
     def from_text(text, password, storage):
