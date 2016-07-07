@@ -43,6 +43,7 @@ from transaction import Transaction
 import paymentrequest
 from paymentrequest import PR_PAID, PR_UNPAID, PR_UNKNOWN, PR_EXPIRED
 import contacts
+from blockchain import Blockchain
 
 known_commands = {}
 
@@ -640,6 +641,17 @@ class Commands:
     def help(self):
         # for the python console
         return sorted(known_commands.keys())
+    
+    @command('')
+    def check_local_blockchain(self, height):
+        # my own command
+        blockchain = Blockchain(self.config, self.network);
+        block_header = blockchain.read_header(height)
+        block_header['block_height'] = height
+        blockchain.verify_chain([block_header])
+        block_header['pow_hash'] = blockchain.pow_hash_header(block_header)
+        block_header['hash'] = blockchain.hash_header(block_header)
+        return block_header
 
 param_descriptions = {
     'privkey': 'Private key. Type \'?\' to get a prompt.',
