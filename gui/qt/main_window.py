@@ -911,7 +911,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, PrintError):
             from electrum_ltc.util import fee_levels
             i = self.fee_slider.sliderPosition()
             tooltip = fee_levels[i]
-            dynfee = self.network.dynfee(i)
+            dynfee = self.network.dynfee(i) if self.network else 0
             if dynfee:
                 tooltip += '\n' + self.format_amount(dynfee) + ' ' + self.base_unit() + '/kB'
             QToolTip.showText(QCursor.pos(), tooltip, self.fee_slider)
