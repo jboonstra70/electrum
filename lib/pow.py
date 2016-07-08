@@ -37,7 +37,7 @@ class PoW(object):
         return self.nTargetTimeSpan / self.nTargetSpacing
         
     def pow_hash_header(self, header):
-        return rev_hex(getPoWHash(self.serialize_header(header).decode('hex')).encode('hex'))
+        return rev_hex(getPoWHash(self.blockchain.serialize_header(header).decode('hex')).encode('hex'))
 
     def bits_to_target(self, bits):
         bitsN = (bits >> 24) & 0xff
@@ -77,8 +77,8 @@ class PoW(object):
         # Litecoin: go back the full period unless it's the first retarget
         interval = self.get_difficultyAdjustmentInterval()
         last_height = height - 1
-        first = self.read_header(last_height - interval if last_height > interval else 0)
-        last = self.read_header(last_height)
+        first = self.blockchain.read_header(last_height - interval if last_height > interval else 0)
+        last = self.blockchain.read_header(last_height)
         if last is None:
             for h in chain:
                 if h.get('block_height') == last_height:
