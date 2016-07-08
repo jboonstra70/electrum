@@ -8,16 +8,23 @@ import util
 from bitcoin import rev_hex
 
 try:
-    from ltc_scrypt import getPoWHash
+    from ltc_scrypt import getPoWHash as getPoWScryptHash
 except ImportError:
     util.print_msg("Warning: ltc_scrypt not available, using fallback")
-    from scrypt import scrypt_1024_1_1_80 as getPoWHash
+    from scrypt import scrypt_1024_1_1_80 as getPoWScryptHash
+    
+try:
+    from groestl_hash import getPoWHash as getPoWGroestlHash
+except ImportError:
+    util.print_msg("Warning: groestl_hash not available, please install it")
+    raise
+
 
 class PoW(object):
     '''
     Proof of Work function for certain coin used by blockchain to verify block headers
+    Default is litecoin
     '''
-
 
     def __init__(self, blockchain):
         '''
@@ -37,7 +44,7 @@ class PoW(object):
         return self.nTargetTimeSpan / self.nTargetSpacing
         
     def pow_hash_header(self, header):
-        return rev_hex(getPoWHash(self.blockchain.serialize_header(header).decode('hex')).encode('hex'))
+        return rev_hex(getPoWScryptHash(self.blockchain.serialize_header(header).decode('hex')).encode('hex'))
 
     def bits_to_target(self, bits):
         bitsN = (bits >> 24) & 0xff
@@ -94,3 +101,49 @@ class PoW(object):
         new_target = min(self.get_max_target(), (target*nActualTimespan) / nTargetTimespan)
         # convert new target to bits
         return self.normalize_target_to_bits(new_target)
+
+
+
+class PoW_AUR(PoW):
+    '''
+    Proof of Work function for aurora coin used by blockchain to verify block headers
+    '''
+    ALGO_SHA256D = 0
+    ALGO_SCRYPT  = 1
+    ALGO_GROESTL = 2
+    ALGO_SKEIN   = 3
+    ALGO_QUBIT   = 4
+    
+    # Primary version
+    BLOCK_VERSION_DEFAULT        = 2
+
+    # Algo
+    BLOCK_VERSION_ALGO           = (7 << 9)
+    BLOCK_VERSION_SHA256D        = (1 << 9)
+    BLOCK_VERSION_GROESTL        = (2 << 9)
+    BLOCK_VERSION_SKEIN          = (3 << 9)
+    BLOCK_VERSION_QUBIT          = (4 << 9)
+
+    def __init__(self, blockchain):
+        '''
+        Constructor
+        '''
+        super(PoW_AUR, self).__init__(blockchain)
+        self.nTargetTimeSpan = 3.5 * 24 * 60 * 60 # 3.5 days
+        self.nTargetSpacing = 2.5 * 60 # 2.5 minutes
+
+    def get_pow_limit(self, algo):
+        return 0x1e0ffff0
+
+    def get_max_target(self, algo):
+        return self.bits_to_target(self.get_pow_limit(algo))
+    
+    def get_algo(self, block_version):
+        return { PoW_AUR.BLOCK_VERSION_SHA256D: PoW_AUR.ALGO_SHA256D,
+                PoW_AUR.BLOCK_VERSION_GROESTL: PoW_AUR.ALGO_GROESTL,
+                PoW_AUR.BLOCK_VERSION_SKEIN: PoW_AUR.ALGO_SKEIN,
+                PoW_AUR.BLOCK_VERSION_QUBIT: PoW_AUR.ALGO_QUBIT
+                }.get(block_version & PoW_AUR.BLOCK_VERSION_ALGO, PoW_AUR.ALGO_SCRYPT)
+    
+    def pow_hash_header(self, header):
+        return rev_hex(getPoWScryptHash(self.blockchain.serialize_header(header).decode('hex')).encode('hex'))
