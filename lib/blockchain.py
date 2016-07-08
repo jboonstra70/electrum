@@ -28,6 +28,7 @@
 import os
 import util
 from bitcoin import *
+from pow import PoW
 
 try:
     from ltc_scrypt import getPoWHash
@@ -43,6 +44,7 @@ class Blockchain(util.PrintError):
     def __init__(self, config, network):
         self.config = config
         self.network = network
+        self.pow = PoW()
         self.headers_url = "" # "https://headers.electrum.org/blockchain_headers"
         self.local_height = 0
         self.set_local_height()
@@ -61,7 +63,7 @@ class Blockchain(util.PrintError):
         #assert bits == header.get('bits'), "bits mismatch: %s vs %s" % (bits, header.get('bits'))
         if bits == header.get('bits'):
             self.print_error("bits mismatch: %s vs %s" % (bits, header.get('bits')))
-        _hash = self.pow_hash_header(header)
+        _hash = self.pow.pow_hash_header(header)
         #assert int('0x' + _hash, 16) <= target, "insufficient proof of work: %s vs target %s \n%s" % (int('0x' + _hash, 16), target, '0x' + _hash)
         if int('0x' + _hash, 16) <= target:
             self.print_error("insufficient proof of work: %s vs target %s \n%s" % (int('0x' + _hash, 16), target, '0x' + _hash))
@@ -71,19 +73,23 @@ class Blockchain(util.PrintError):
         prev_header = self.read_header(first_header.get('block_height') - 1)
         for header in chain:
             height = header.get('block_height')
-            bits, target = self.get_target(height / 2016, chain)
+            bits, target = self.pow.get_target(height, chain)
             self.verify_header(header, prev_header, bits, target)
             prev_header = header
 
     def verify_chunk(self, index, data):
         num = len(data) / 80
+        chain = []
         prev_header = None
         if index != 0:
             prev_header = self.read_header(index*2016 - 1)
-        bits, target = self.get_target(index)
+        chunk_base_height = index * 2016 
         for i in range(num):
             raw_header = data[i*80:(i+1) * 80]
             header = self.deserialize_header(raw_header)
+            header['block_height'] = chunk_base_height + i
+            chain.append(header)
+            bits, target = self.pow.get_target(chunk_base_height + i, chain)
             self.verify_header(header, prev_header, bits, target)
             prev_header = header
 
@@ -167,6 +173,7 @@ class Blockchain(util.PrintError):
             f.close()
             if len(h) == 80:
                 h = self.deserialize_header(h)
+                h['block_height'] = block_height # add block height to structure PoW functions may need it
                 return h
 
     def get_target(self, index, chain=None):
