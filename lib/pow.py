@@ -5,7 +5,7 @@ Created on 8 Jul 2016
 '''
 
 import util
-from bitcoin import rev_hex
+from bitcoin import hash_encode
 
 try:
     from ltc_scrypt import getPoWHash as getPoWScryptHash
@@ -17,6 +17,18 @@ try:
     from groestl_hash import getPoWHash as getPoWGroestlHash
 except ImportError:
     util.print_msg("Warning: groestl_hash not available, please install it")
+    raise
+
+try:
+    from skeinhash import getPoWHash as getPoWSkeinHash
+except ImportError:
+    util.print_msg("Warning: skeinhash not available, please install it")
+    raise
+
+try:
+    from qubit_hash import getPoWHash as getPoWQubitHash
+except ImportError:
+    util.print_msg("Warning: qubit-hash not available, please install it")
     raise
 
 
@@ -44,7 +56,7 @@ class PoW(object):
         return self.nTargetTimeSpan / self.nTargetSpacing
         
     def pow_hash_header(self, header):
-        return rev_hex(getPoWScryptHash(self.blockchain.serialize_header(header).decode('hex')).encode('hex'))
+        return hash_encode(getPoWScryptHash(self.blockchain.serialize_header(header).decode('hex')))
 
     def bits_to_target(self, bits):
         bitsN = (bits >> 24) & 0xff
@@ -123,19 +135,40 @@ class PoW_AUR(PoW):
     BLOCK_VERSION_GROESTL        = (2 << 9)
     BLOCK_VERSION_SKEIN          = (3 << 9)
     BLOCK_VERSION_QUBIT          = (4 << 9)
+    
+    # Max target algo
+    MAX_TARGET_ALGO_SHA256D = 0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF # CBigNum(~uint256(0) >> 32);
+    MAX_TARGET_ALGO_SCRYPT  = 0x00000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF # CBigNum(~uint256(0) >> 20);
+    MAX_TARGET_ALGO_GROESTL = 0x000001FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF # CBigNum(~uint256(0) >> 23);
+    MAX_TARGET_ALGO_SKEIN   = 0x000001FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF # CBigNum(~uint256(0) >> 23);
+    MAX_TARGET_ALGO_QUBIT   = 0x000003FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF # CBigNum(~uint256(0) >> 22);
+    
+    
+    multiAlgoDiffChangeTarget = 225000; # block 225000 where multi-algo work weighting starts 225000
 
     def __init__(self, blockchain):
         '''
         Constructor
         '''
         super(PoW_AUR, self).__init__(blockchain)
-        self.nTargetTimeSpan = 3.5 * 24 * 60 * 60 # 3.5 days
-        self.nTargetSpacing = 2.5 * 60 # 2.5 minutes
+        self.nTargetTimeSpan = 8 * 10 * 60 # Legacy 4800
+        self.nTargetSpacing = 10 * 60 # 60 seconds
+        self.multiAlgoNum = 5 # Amount of algos
+        self.multiAlgoTimespan = 61 # Time per block per algo
+        self.multiAlgoTargetSpacing = self.multiAlgoNum * self.multiAlgoTimespan
+        self.nAveragingInterval = 10 # 10 blocks
+        self.nAveragingTargetTimespan = self.nAveragingInterval * self.multiAlgoTargetSpacing # 10* NUM_ALGOS * 61
 
-    def get_pow_limit(self, algo):
-        return 0x1e0ffff0
+    def get_pow_limit(self, algo = ALGO_SCRYPT):
+        maxTarget = { PoW_AUR.ALGO_SHA256D: PoW_AUR.MAX_TARGET_ALGO_SHA256D, 
+            PoW_AUR.ALGO_SCRYPT: PoW_AUR.MAX_TARGET_ALGO_SCRYPT,
+            PoW_AUR.ALGO_GROESTL: PoW_AUR.MAX_TARGET_ALGO_GROESTL,
+            PoW_AUR.ALGO_SKEIN: PoW_AUR.MAX_TARGET_ALGO_SKEIN,
+            PoW_AUR.ALGO_QUBIT: PoW_AUR.MAX_TARGET_ALGO_QUBIT }.get(algo, PoW_AUR.MAX_TARGET_ALGO_SCRYPT)
 
-    def get_max_target(self, algo):
+        return self.target_to_bits(maxTarget)
+
+    def get_max_target(self, algo = ALGO_SCRYPT):
         return self.bits_to_target(self.get_pow_limit(algo))
     
     def get_algo(self, block_version):
@@ -145,5 +178,85 @@ class PoW_AUR(PoW):
                 PoW_AUR.BLOCK_VERSION_QUBIT: PoW_AUR.ALGO_QUBIT
                 }.get(block_version & PoW_AUR.BLOCK_VERSION_ALGO, PoW_AUR.ALGO_SCRYPT)
     
+    def pow_scrypt_hash_header(self, header):
+        return hash_encode(getPoWScryptHash(self.blockchain.serialize_header(header).decode('hex')))
+    
+    def pow_groestl_hash_header(self, header):
+        return hash_encode(getPoWGroestlHash(self.blockchain.serialize_header(header).decode('hex')))
+    
+    def pow_skein_hash_header(self, header):
+        return hash_encode(getPoWSkeinHash(self.blockchain.serialize_header(header).decode('hex')))
+    
+    def pow_qubit_hash_header(self, header):
+        return hash_encode(getPoWQubitHash(self.blockchain.serialize_header(header).decode('hex')))
+    
     def pow_hash_header(self, header):
-        return rev_hex(getPoWScryptHash(self.blockchain.serialize_header(header).decode('hex')).encode('hex'))
+        block_version = header['version'];
+        getPoWHash = { PoW_AUR.ALGO_SCRYPT: self.pow_scrypt_hash_header,
+                       PoW_AUR.ALGO_GROESTL: self.pow_groestl_hash_header,
+                       PoW_AUR.ALGO_SKEIN: self.pow_skein_hash_header,
+                       PoW_AUR.ALGO_QUBIT: self.pow_qubit_hash_header }.get(self.get_algo(block_version), self.blockchain.hash_header)
+        return getPoWHash(header)
+
+    def get_header(self, height, chain=None):
+        header = self.blockchain.read_header(height)
+        if header is None:
+            for h in chain:
+                if h.get('block_height') == height:
+                    return h
+        return header
+        
+    def get_target_original(self, height, chain=None):
+        if height == 0:
+            return self.get_pow_limit(), self.get_max_target()
+        if height < 135:
+            return self.get_pow_limit(), self.get_max_target()
+        interval = self.get_difficultyAdjustmentInterval()
+        last_height = height - 1
+        last = self.get_header(last_height)
+        assert last is not None
+        # changed only once per interval
+        last_target = self.bits_to_target(last['bits'])
+        if (height % interval) != 0:
+            return last['bits'], last_target 
+        first_height = last_height - interval
+        if height == interval:
+            first_height = 0
+        first = self.get_header(first_height, chain)
+        # new target
+        nActualTimespan = last.get('timestamp') - first.get('timestamp')
+        nTargetTimespan = self.nTargetTimeSpan
+        nActualTimespan = max(nActualTimespan, (nTargetTimespan * 50) / 75)
+        nActualTimespan = min(nActualTimespan, (nTargetTimespan * 75) / 50)
+        new_target = min(self.get_max_target(), (last_target*nActualTimespan) / nTargetTimespan)
+        # convert new target to bits
+        return self.normalize_target_to_bits(new_target)
+        
+        
+    
+    def get_target_KGW(self, height, chain=None):
+        #TODO implement this
+        return self.get_target_original(height, chain)
+    
+    def get_target_Multi(self, height, chain=None):
+        #TODO implement this
+        return self.get_target_original(height, chain)
+    
+    def get_target(self, height, chain=None):
+        diffMode = 1
+        if height <= 5400:
+            diffMode = 1
+        elif height <= PoW_AUR.multiAlgoDiffChangeTarget:
+            diffMode = 2
+        else:
+            diffMode = 3
+
+        if diffMode == 1:
+            return self.get_target_original(height, chain)
+        elif diffMode == 2:
+            return self.get_target_KGW(height, chain)
+        elif diffMode == 3:
+            return self.get_target_Multi(height, chain)
+        
+        return self.get_target_Multi(height, chain)
+    

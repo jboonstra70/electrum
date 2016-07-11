@@ -643,15 +643,28 @@ class Commands:
         return sorted(known_commands.keys())
     
     @command('')
-    def check_local_blockchain(self, height):
+    def check_local_blockchain(self, height, to_height=None):
         # my own command
         blockchain = Blockchain(self.config, self.network);
-        block_header = blockchain.read_header(height)
-        block_header['block_height'] = height
-        blockchain.verify_chain([block_header])
-        block_header['pow_hash'] = blockchain.pow_hash_header(block_header)
-        block_header['hash'] = blockchain.hash_header(block_header)
-        return block_header
+        if to_height is None:
+            block_header = blockchain.read_header(height)
+            block_header['block_height'] = height
+            blockchain.verify_chain([block_header])
+            block_header['pow_hash'] = blockchain.pow_hash_header(block_header)
+            block_header['hash'] = blockchain.hash_header(block_header)
+            return block_header
+        from_height = min(height, to_height)
+        to_height = max(height, to_height) + 1
+        failed = []
+        for h in range( from_height, to_height):
+            block_header = blockchain.read_header(h)
+            block_header['block_height'] = h
+            try:
+                blockchain.verify_chain([block_header])
+            except AssertionError as e:
+                util.print_error(str(e))
+                failed.append(block_header)
+        return failed
 
 param_descriptions = {
     'privkey': 'Private key. Type \'?\' to get a prompt.',
@@ -699,6 +712,7 @@ command_options = {
     'pending':     (None, "--pending",     "Show only pending requests."),
     'expired':     (None, "--expired",     "Show only expired requests."),
     'paid':        (None, "--paid",        "Show only paid requests."),
+    'to_height':   (None, "--to-height",   "Check range of block header."),
 }
 
 

@@ -28,7 +28,7 @@
 import os
 import util
 from bitcoin import *
-from pow import PoW
+from pow import PoW_AUR
 
 try:
     from ltc_scrypt import getPoWHash
@@ -44,7 +44,7 @@ class Blockchain(util.PrintError):
     def __init__(self, config, network):
         self.config = config
         self.network = network
-        self.pow = PoW(self)
+        self.pow = PoW_AUR(self)
         self.headers_url = "" # "https://headers.electrum.org/blockchain_headers"
         self.local_height = 0
         self.set_local_height()
@@ -60,13 +60,13 @@ class Blockchain(util.PrintError):
     def verify_header(self, header, prev_header, bits, target):
         prev_hash = self.hash_header(prev_header)
         assert prev_hash == header.get('prev_block_hash'), "prev hash mismatch: %s vs %s" % (prev_hash, header.get('prev_block_hash'))
-        #assert bits == header.get('bits'), "bits mismatch: %s vs %s" % (bits, header.get('bits'))
-        if bits == header.get('bits'):
-            self.print_error("bits mismatch: %s vs %s" % (bits, header.get('bits')))
+        assert bits == header.get('bits'), "bits mismatch: %s vs %s" % (bits, header.get('bits'))
+        # if bits != header.get('bits'):
+        #    self.print_error("bits mismatch: %s vs %s" % (bits, header.get('bits')))
         _hash = self.pow.pow_hash_header(header)
-        #assert int('0x' + _hash, 16) <= target, "insufficient proof of work: %s vs target %s \n%s" % (int('0x' + _hash, 16), target, '0x' + _hash)
-        if int('0x' + _hash, 16) <= target:
-            self.print_error("insufficient proof of work: %s vs target %s \n%s" % (int('0x' + _hash, 16), target, '0x' + _hash))
+        assert int('0x' + _hash, 16) <= target, "insufficient proof of work: %s vs target %s \n%s" % (int('0x' + _hash, 16), target, '0x' + _hash)
+        #if int('0x' + _hash, 16) > target:
+        #    self.print_error("insufficient proof of work: %s vs target %s \n%s" % (int('0x' + _hash, 16), target, '0x' + _hash))
             
     def verify_chain(self, chain):
         first_header = chain[0]
