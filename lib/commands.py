@@ -657,6 +657,8 @@ class Commands:
         to_height = max(height, to_height) + 1
         failed = []
         for h in range( from_height, to_height):
+            if h % 100 == 0:
+                util.print_error('checking height: {:d}'.format(h))
             block_header = blockchain.read_header(h)
             block_header['block_height'] = h
             try:
