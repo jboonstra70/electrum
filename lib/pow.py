@@ -232,11 +232,77 @@ class PoW_AUR(PoW):
         # convert new target to bits
         return self.normalize_target_to_bits(new_target)
         
+    def kimotoGravityWell(self, height, chain, targetBlockSpacingSeconds, pastBlocksMin, pastBlocksMax):
+        blockLastSolved = height - 1
+        blockReading = height - 1
+        #blockHeaderCreating = self.get_header(height, chain)
         
+        pastBlocksMass = 0
+        pastRateActualSeconds = 0
+        pastRateTargetSeconds = 0
+        pastRateAdjustmentRatio = 1.0
+        pastDifficultyAverage = 0
+        pastDifficultyAveragePrev = 0
+#        eventHorizonDeviation;
+#        eventHorizonDeviationFast;
+#        eventHorizonDeviationSlow;
+        if blockLastSolved == 0 or blockLastSolved < pastBlocksMin:
+            return self.get_pow_limit(), self.get_max_target()
+        
+        blockHeaderLastSolved = self.get_header(blockLastSolved, chain)
+        
+        for i in range(1, pastBlocksMax + 1):
+            if pastBlocksMax > 0 and i > pastBlocksMax:
+                break
+            
+            blockHeaderReading = self.get_header(blockReading, chain)
+            pastBlocksMass += 1
+            
+            if i == 1:
+                pastDifficultyAverage = self.bits_to_target(blockHeaderReading['bits'])
+            else:
+                pastDifficultyAverage = ((self.bits_to_target(blockHeaderReading['bits']) - pastDifficultyAveragePrev) / i) + pastDifficultyAveragePrev
+                
+            pastDifficultyAveragePrev = pastDifficultyAverage
+            
+            pastRateActualSeconds =  blockHeaderLastSolved['timestamp'] - blockHeaderReading['timestamp']
+            pastRateTargetSeconds = targetBlockSpacingSeconds * pastBlocksMass
+            pastRateAdjustmentRatio = 1.0
+            if pastRateActualSeconds < 0:
+                pastRateActualSeconds = 0
+            if pastRateActualSeconds != 0 and pastRateTargetSeconds != 0:
+                pastRateAdjustmentRatio = float(pastRateTargetSeconds) / float(pastRateActualSeconds)
+            
+            eventHorizonDeviation = 1 + (0.7084 * pow((float(pastBlocksMass)/144.0), -1.228));
+            eventHorizonDeviationFast = eventHorizonDeviation
+            eventHorizonDeviationSlow = 1 / eventHorizonDeviation
+
+            if pastBlocksMass >= pastBlocksMin:
+                if (pastRateAdjustmentRatio <= eventHorizonDeviationSlow) or (pastRateAdjustmentRatio >= eventHorizonDeviationFast): 
+                    # assert(BlockReading)
+                    break
+            
+            #     if (BlockReading->pprev == NULL) { assert(BlockReading); break; }
+            blockReading -= 1
+
+        new_target = pastDifficultyAverage
+        if pastRateActualSeconds != 0 and pastRateTargetSeconds != 0:
+            new_target *= pastRateActualSeconds
+            new_target /= pastRateTargetSeconds
+            
+        if new_target > self.get_max_target():
+            new_target = self.get_max_target()
+            
+        return self.normalize_target_to_bits(new_target)
     
     def get_target_KGW(self, height, chain=None):
-        #TODO implement this
-        return self.get_target_original(height, chain)
+        nBlocksTargetSpacing = 5 * 60 # 1 minute
+        nTimeDaySeconds = 60 * 60 * 24
+        nPastSecondsMin = nTimeDaySeconds * 0.5
+        nPastSecondsMax = nTimeDaySeconds * 14
+        nPastBlocksMin  = nPastSecondsMin / nBlocksTargetSpacing
+        nPastBlocksMax  = nPastSecondsMax / nBlocksTargetSpacing
+        return self.kimotoGravityWell(height, chain, nBlocksTargetSpacing, nPastBlocksMin, nPastBlocksMax)
     
     def get_target_Multi(self, height, chain=None):
         #TODO implement this
