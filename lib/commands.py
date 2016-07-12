@@ -657,6 +657,9 @@ class Commands:
         to_height = max(height, to_height) + 1
         failed = []
         for h in range( from_height, to_height):
+            if len(failed) > 50:
+                util.print_error('Too many failed at height: {:d}'.format(h))
+                break
             if h % 100 == 0:
                 util.print_error('checking height: {:d}'.format(h))
             block_header = blockchain.read_header(h)
