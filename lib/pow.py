@@ -32,7 +32,7 @@ except ImportError:
     raise
 
 
-class PoW(object):
+class PoW(util.PrintError):
     '''
     Proof of Work function for certain coin used by blockchain to verify block headers
     Default is litecoin
@@ -158,6 +158,15 @@ class PoW_AUR(PoW):
         self.multiAlgoTargetSpacing = self.multiAlgoNum * self.multiAlgoTimespan
         self.nAveragingInterval = 10 # 10 blocks
         self.nAveragingTargetTimespan = self.nAveragingInterval * self.multiAlgoTargetSpacing # 10* NUM_ALGOS * 61
+        
+        self.nMaxAdjustDownV4 = 16
+        self.nMaxAdjustUpV4 = 8
+        self.nLocalDifficultyAdjustment = 4 # difficulty adjustment per algo
+        self.nLocalTargetAdjustment = 4 # target adjustment per algo
+
+        self.nMinActualTimespanV4 = self.nAveragingTargetTimespan * (100 - self.nMaxAdjustUpV4) / 100
+        self.nMaxActualTimespanV4 = self.nAveragingTargetTimespan * (100 + self.nMaxAdjustDownV4) / 100
+        self.nMedianTimeSpan = 11
 
     def get_pow_limit(self, algo = ALGO_SCRYPT):
         maxTarget = { PoW_AUR.ALGO_SHA256D: PoW_AUR.MAX_TARGET_ALGO_SHA256D, 
@@ -177,6 +186,9 @@ class PoW_AUR(PoW):
                 PoW_AUR.BLOCK_VERSION_SKEIN: PoW_AUR.ALGO_SKEIN,
                 PoW_AUR.BLOCK_VERSION_QUBIT: PoW_AUR.ALGO_QUBIT
                 }.get(block_version & PoW_AUR.BLOCK_VERSION_ALGO, PoW_AUR.ALGO_SCRYPT)
+
+    def get_algo_header(self, header):
+        return self.get_algo(header['version'])
     
     def pow_scrypt_hash_header(self, header):
         return hash_encode(getPoWScryptHash(self.blockchain.serialize_header(header).decode('hex')))
@@ -213,7 +225,7 @@ class PoW_AUR(PoW):
             return self.get_pow_limit(), self.get_max_target()
         interval = self.get_difficultyAdjustmentInterval()
         last_height = height - 1
-        last = self.get_header(last_height)
+        last = self.get_header(last_height, chain)
         assert last is not None
         # changed only once per interval
         last_target = self.bits_to_target(last['bits'])
@@ -304,9 +316,71 @@ class PoW_AUR(PoW):
         nPastBlocksMax  = nPastSecondsMax / nBlocksTargetSpacing
         return self.kimotoGravityWell(height, chain, nBlocksTargetSpacing, nPastBlocksMin, nPastBlocksMax)
     
+    def getLastHeaderForAlgo(self, header, chain, algo):
+        current_header = header
+        while current_header is not None:
+            if self.get_algo_header(current_header) == algo:
+                return current_header
+            current_header = self.get_header(current_header['block_height'] - 1, chain)
+        return None
+    
+    def getMedianTimePast(self, header, chain):
+        end_height = header['block_heigth']
+        begin_height = end_height - self.nMedianTimeSpan if end_height > self.nMedianTimeSpan else 0 
+        median_height = (end_height - begin_height) / 2
+        median = self.get_header(median_height, chain)
+        return median['timestamp']
+    
     def get_target_Multi(self, height, chain=None):
-        #TODO implement this
-        return self.get_target_original(height, chain)
+        self.print_msg("Get target Multi")
+        last_height = height - 1
+        last = self.get_header(last_height, chain)
+        assert last is not None
+        first_height = last_height - self.multiAlgoNum * self.nAveragingInterval
+        first = self.get_header(first_height, chain)
+        assert first is not None
+        current = self.get_header(height, chain)
+        algo = self.get_algo_header(current)
+        prevAlgo = self.getLastHeaderForAlgo(last, algo)
+        if prevAlgo is None:
+            return self.get_pow_limit(algo), self.get_max_target(algo)
+        
+        # Limit adjustment step
+        # Use medians to prevent time-warp attacks
+        nActualTimespan = self.getMedianTimePast(last, chain) - self.getMedianTimePast(first, chain);
+        nActualTimespan = self.nAveragingTargetTimespan + (nActualTimespan - self.nAveragingTargetTimespan)/4;
+    
+        self.print_msg("nActualTimespan = {:d} before bounds".format(nActualTimespan))
+    
+        if nActualTimespan < self.nMinActualTimespanV4:
+            nActualTimespan = self.nMinActualTimespanV4
+        if nActualTimespan > self.nMaxActualTimespanV4:
+            nActualTimespan = self.nMaxActualTimespanV4
+    
+        # Global retarget
+        new_target = self.bits_to_target(prevAlgo['bits'])
+    
+        new_target *= nActualTimespan
+        new_target /= self.nAveragingTargetTimespan
+    
+        # Per-algo retarget
+        nAdjustments = prevAlgo['block_height'] + self.multiAlgoNum - 1 - last_height;
+        if nAdjustments > 0:
+            for i in range(nAdjustments):
+                new_target *= 100;
+                new_target /= (100 + self.nLocalTargetAdjustment);
+        elif nAdjustments < 0: # make it easier
+            for i in range(abs(nAdjustments)):
+                new_target *= (100 + self.nLocalTargetAdjustment);
+                new_target /= 100;
+    
+        if new_target > self.get_max_target(algo):
+            self.print_msg("New nBits below minimum work: Use default POW Limit\n")
+            return self.get_pow_limit(algo), self.get_max_target(algo)
+    
+        #LogPrintf("MULTI %d  %d  %08x  %08x  %s\n", multiAlgoTimespan, nActualTimespan, pindexLast->nBits, bnNew.GetCompact(), bnNew.getuint256().ToString().c_str());
+    
+        return self.normalize_target_to_bits(new_target)
     
     def get_target(self, height, chain=None):
         diffMode = 1
