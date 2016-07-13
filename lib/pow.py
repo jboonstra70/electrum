@@ -321,18 +321,18 @@ class PoW_AUR(PoW):
         while current_header is not None:
             if self.get_algo_header(current_header) == algo:
                 return current_header
-            current_header = self.get_header(current_header['block_height'] - 1, chain)
+            current_header = self.get_header(current_header['block_height'] - 1, chain) if current_header['block_height'] > self.multiAlgoDiffChangeTarget else None
         return None
     
     def getMedianTimePast(self, header, chain):
-        end_height = header['block_heigth']
+        end_height = header['block_height']
         begin_height = end_height - self.nMedianTimeSpan if end_height > self.nMedianTimeSpan else 0 
-        median_height = (end_height - begin_height) / 2
+        median_height = begin_height + (end_height - begin_height) / 2
         median = self.get_header(median_height, chain)
         return median['timestamp']
     
     def get_target_Multi(self, height, chain=None):
-        self.print_msg("Get target Multi")
+        self.print_error("Get target Multi")
         last_height = height - 1
         last = self.get_header(last_height, chain)
         assert last is not None
@@ -341,7 +341,7 @@ class PoW_AUR(PoW):
         assert first is not None
         current = self.get_header(height, chain)
         algo = self.get_algo_header(current)
-        prevAlgo = self.getLastHeaderForAlgo(last, algo)
+        prevAlgo = self.getLastHeaderForAlgo(last, chain, algo)
         if prevAlgo is None:
             return self.get_pow_limit(algo), self.get_max_target(algo)
         
@@ -350,7 +350,7 @@ class PoW_AUR(PoW):
         nActualTimespan = self.getMedianTimePast(last, chain) - self.getMedianTimePast(first, chain);
         nActualTimespan = self.nAveragingTargetTimespan + (nActualTimespan - self.nAveragingTargetTimespan)/4;
     
-        self.print_msg("nActualTimespan = {:d} before bounds".format(nActualTimespan))
+        self.print_error("nActualTimespan = {:d} before bounds".format(nActualTimespan))
     
         if nActualTimespan < self.nMinActualTimespanV4:
             nActualTimespan = self.nMinActualTimespanV4
@@ -364,7 +364,7 @@ class PoW_AUR(PoW):
         new_target /= self.nAveragingTargetTimespan
     
         # Per-algo retarget
-        nAdjustments = prevAlgo['block_height'] + self.multiAlgoNum - 1 - last_height;
+        nAdjustments = prevAlgo['block_height'] + self.multiAlgoNum - 1 - last_height
         if nAdjustments > 0:
             for i in range(nAdjustments):
                 new_target *= 100;
@@ -375,7 +375,7 @@ class PoW_AUR(PoW):
                 new_target /= 100;
     
         if new_target > self.get_max_target(algo):
-            self.print_msg("New nBits below minimum work: Use default POW Limit\n")
+            self.print_error("New nBits below minimum work: Use default POW Limit at height {:d}".format(height))
             return self.get_pow_limit(algo), self.get_max_target(algo)
     
         #LogPrintf("MULTI %d  %d  %08x  %08x  %s\n", multiAlgoTimespan, nActualTimespan, pindexLast->nBits, bnNew.GetCompact(), bnNew.getuint256().ToString().c_str());
