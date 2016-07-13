@@ -649,7 +649,11 @@ class Commands:
         if to_height is None:
             block_header = blockchain.read_header(height)
             block_header['block_height'] = height
-            blockchain.verify_chain([block_header])
+            try:
+                blockchain.verify_chain([block_header])
+            except AssertionError as e:
+                util.print_error(str(e))
+                block_header['bits_target'] = blockchain.pow.bits_to_target(block_header['bits'])
             block_header['pow_hash'] = blockchain.pow_hash_header(block_header)
             block_header['hash'] = blockchain.hash_header(block_header)
             return block_header
