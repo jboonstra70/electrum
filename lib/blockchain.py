@@ -60,7 +60,7 @@ class Blockchain(util.PrintError):
     def verify_header(self, header, prev_header, bits, target):
         prev_hash = self.hash_header(prev_header)
         assert prev_hash == header.get('prev_block_hash'), "prev hash mismatch: %s vs %s" % (prev_hash, header.get('prev_block_hash'))
-        assert bits == header.get('bits'), "bits mismatch: %s vs %s" % (bits, header.get('bits'))
+        assert bits == header.get('bits'), "bits mismatch: %s (%08x) vs %s (%08x)" % (bits, bits, header.get('bits'), header.get('bits'))
         # if bits != header.get('bits'):
         #    self.print_error("bits mismatch: %s vs %s" % (bits, header.get('bits')))
         _hash = self.pow.pow_hash_header(header)
