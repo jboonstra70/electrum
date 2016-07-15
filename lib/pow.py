@@ -325,14 +325,21 @@ class PoW_AUR(PoW):
         return None
     
     def getMedianTimePast(self, header, chain):
-        end_height = header['block_height']
-        begin_height = end_height - self.nMedianTimeSpan if end_height > self.nMedianTimeSpan else 0 
-        median_height = begin_height + (end_height - begin_height) / 2
-        median = self.get_header(median_height, chain)
-        return median['timestamp']
+        median = []
+        i = 0
+        pindex = header['block_height']
+        while i < self.nMedianTimeSpan and pindex >= 0:
+            pindex_header = self.get_header(pindex, chain)
+            median.append((pindex_header['timestamp'], pindex))
+            i += 1
+            pindex -= 1
+            
+        median.sort(lambda x,y: cmp(x[0], y[0]))
+        new_median = median[len(median)/2][0]
+        return new_median
     
     def get_target_Multi(self, height, chain=None):
-        self.print_error("Get target Multi")
+        self.print_error("Get target Multi for height %d" % height)
         last_height = height - 1
         last = self.get_header(last_height, chain)
         assert last is not None
@@ -347,8 +354,9 @@ class PoW_AUR(PoW):
         
         # Limit adjustment step
         # Use medians to prevent time-warp attacks
-        nActualTimespan = self.getMedianTimePast(last, chain) - self.getMedianTimePast(first, chain);
-        nActualTimespan = self.nAveragingTargetTimespan + (nActualTimespan - self.nAveragingTargetTimespan)/4;
+        nActualTimespan = self.getMedianTimePast(last, chain) - self.getMedianTimePast(first, chain)
+        # do float division than convert to int which truncates towards zero like the c++ integer division
+        nActualTimespan = self.nAveragingTargetTimespan + int(float(nActualTimespan - self.nAveragingTargetTimespan)/4)
     
         self.print_error("nActualTimespan = {:d} before bounds".format(nActualTimespan))
     
@@ -359,26 +367,29 @@ class PoW_AUR(PoW):
     
         # Global retarget
         new_target = self.bits_to_target(prevAlgo['bits'])
-    
+        #self.print_error("New target(prev) %d (%064x)" % (new_target, new_target))
         new_target *= nActualTimespan
         new_target /= self.nAveragingTargetTimespan
-    
+        #self.print_error("New target(avgt) %d (%064x)" % (new_target, new_target))
         # Per-algo retarget
         nAdjustments = prevAlgo['block_height'] + self.multiAlgoNum - 1 - last_height
         if nAdjustments > 0:
             for i in range(nAdjustments):
-                new_target *= 100;
-                new_target /= (100 + self.nLocalTargetAdjustment);
+                new_target *= 100
+                new_target /= (100 + self.nLocalTargetAdjustment)
+                #self.print_error("New target(%d) %d (%064x)" % (i, new_target, new_target))
         elif nAdjustments < 0: # make it easier
             for i in range(abs(nAdjustments)):
-                new_target *= (100 + self.nLocalTargetAdjustment);
-                new_target /= 100;
+                new_target *= (100 + self.nLocalTargetAdjustment)
+                new_target /= 100
+                #self.print_error("New target(%d) %d (%064x)" % (i, new_target, new_target))
     
         if new_target > self.get_max_target(algo):
             self.print_error("New nBits below minimum work: Use default POW Limit at height {:d}".format(height))
             return self.get_pow_limit(algo), self.get_max_target(algo)
     
         #LogPrintf("MULTI %d  %d  %08x  %08x  %s\n", multiAlgoTimespan, nActualTimespan, pindexLast->nBits, bnNew.GetCompact(), bnNew.getuint256().ToString().c_str());
+        self.print_error("New target %d (%064x)" % (new_target, new_target))
     
         return self.normalize_target_to_bits(new_target)
     
