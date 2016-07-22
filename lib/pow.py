@@ -211,11 +211,15 @@ class PoW_AUR(PoW):
         return getPoWHash(header)
 
     def get_header(self, height, chain=None):
-        header = self.blockchain.read_header(height)
-        if header is None:
+        # favour chain above local storage, because of possible orphaned block header in past 
+        if chain is not None:
             for h in chain:
-                if h.get('block_height') == height:
+                h_height = h.get('block_height') 
+                if h_height == height:
                     return h
+                elif h_height > height: # no use to continue looking in chain because height only goes up
+                    break
+        header = self.blockchain.read_header(height)
         return header
         
     def get_target_original(self, height, chain=None):
