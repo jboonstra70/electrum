@@ -37,7 +37,6 @@ from electrum_gui.qt.amountedit import AmountEdit
 from electrum_gui.qt.main_window import StatusBarButton
 from electrum.i18n import _
 from electrum.plugins import hook
-from electrum import wizard
 
 from trustedcoin import TrustedCoinPlugin, DISCLAIMER, server
 
@@ -110,14 +109,9 @@ class Plugin(TrustedCoinPlugin):
         return WaitingDialog(window, 'Getting billing information...', task,
                              on_finished)
 
-    def confirm(self, window, msg):
-        vbox = QVBoxLayout()
-        vbox.addWidget(WWLabel(msg))
-        window.set_main_layout(vbox)
-
-    def show_disclaimer(self, wallet, window):
-        window.set_icon(':icons/trustedcoin.png')
-        self.confirm(window, '\n\n'.join(DISCLAIMER))
+    def show_disclaimer(self, wallet, wizard):
+        wizard.set_icon(':icons/trustedcoin.png')
+        wizard.confirm('\n\n'.join(DISCLAIMER))
         self.set_enabled(wallet, True)
 
     @hook
