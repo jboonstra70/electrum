@@ -648,7 +648,8 @@ class Commands:
         blockchain = Blockchain(self.config, self.network);
         if to_height is None:
             block_header = blockchain.read_header(height)
-            block_header['block_height'] = height
+            if block_header is None:
+                return
             try:
                 blockchain.verify_chain([block_header])
             except AssertionError as e:
@@ -667,7 +668,8 @@ class Commands:
             if h % 100 == 0:
                 util.print_error('checking height: {:d}'.format(h))
             block_header = blockchain.read_header(h)
-            block_header['block_height'] = h
+            if block_header is None:
+                break
             try:
                 blockchain.verify_chain([block_header])
             except AssertionError as e:
