@@ -153,7 +153,7 @@ Builder.load_string('''
 
 
 <WizardChoiceDialog>
-    message : ''
+    message: ''
     Widget:
         size_hint: 1, 1
     Label:
