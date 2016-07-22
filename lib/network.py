@@ -48,8 +48,8 @@ DEFAULT_PORTS = {'t':'50001', 's':'50002', 'h':'8081', 'g':'8082'}
 
 DEFAULT_SERVERS = {
     '89.18.181.139':{'t':'80', 's':'443'},
-#    'aur-cce-1.coinomi.net':{'t':'5041', 's':'50002'},
-#    'aur-cce-2.coinomi.net':{'t':'5041', 's':'50002'},
+    'aur-cce-1.coinomi.net':{'t':'5041', 's':'50002'},
+    'aur-cce-2.coinomi.net':{'t':'5041', 's':'50002'},
 #    'einfachmalnettsein.de': {'t':'40001', 's':'40002'},
 #    'electrum.cryptomachine.com': DEFAULT_PORTS,
 #    'electrum-ltc.alexcos.ro': {'t':'50003', 's':'50004'},
