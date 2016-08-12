@@ -727,7 +727,7 @@ class Transaction:
         return self.input_value() - self.output_value()
 
     def is_final(self):
-        return not any([x.get('sequence') < 0xffffffff - 1 for x in self.inputs()])
+        return not any([x.get('sequence', 0xffffffff) < 0xffffffff - 1 for x in self.inputs()])
 
     @profiler
     def estimated_size(self):
@@ -854,8 +854,8 @@ class Transaction:
         threshold = 57600000*4
         weight = 0
         for txin in self.inputs():
-            age = wallet.get_confirmations(txin["prevout_hash"])[0]
-            weight += txin["value"] * age
+            height, conf, timestamp = wallet.get_tx_height(txin["prevout_hash"])
+            weight += txin["value"] * conf
         priority = weight / size
         print_error(priority, threshold)
 

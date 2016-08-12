@@ -43,17 +43,18 @@ class BaseWizard(object):
         self.wallet = None
         self.stack = []
 
-    def run(self, action, *args):
+    def run(self, *args):
+        action = args[0]
+        args = args[1:]
         self.stack.append((action, args))
         if not action:
             return
-        if hasattr(self.wallet, 'plugin'):
-            if hasattr(self.wallet.plugin, action):
-                f = getattr(self.wallet.plugin, action)
-                apply(f, (self.wallet, self) + args)
+        if hasattr(self.wallet, 'plugin') and hasattr(self.wallet.plugin, action):
+            f = getattr(self.wallet.plugin, action)
+            apply(f, (self.wallet, self) + args)
         elif hasattr(self, action):
             f = getattr(self, action)
-            apply(f, *args)
+            apply(f, args)
         else:
             raise BaseException("unknown action", action)
 
@@ -78,12 +79,6 @@ class BaseWizard(object):
         self.stack.pop()
         action, args = self.stack.pop()
         self.run(action, *args)
-
-    def run_wallet(self):
-        self.stack = []
-        action = self.wallet.get_action()
-        if action:
-            self.action_dialog(action=action, run_next=lambda x: self.run_wallet())
 
     def new(self):
         name = os.path.basename(self.storage.path)
@@ -139,14 +134,14 @@ class BaseWizard(object):
                 ('create_seed', _('Create a new seed')),
                 ('restore_seed', _('I already have a seed')),
                 ('restore_from_key', _('I have a master key')),
-                ('choose_hw', _('Cosign with hardware wallet')),
+                #('choose_hw', _('Cosign with hardware wallet')),
             ]
         self.choice_dialog(title=title, message=message, choices=choices, run_next=self.run)
 
     def create_2fa(self):
         self.storage.put('wallet_type', '2fa')
         self.wallet = Wallet(self.storage)
-        self.run_wallet()
+        self.run('show_disclaimer')
 
     def restore_seed(self):
         # TODO: return derivation password too
@@ -232,14 +227,12 @@ class BaseWizard(object):
             self.storage.put('wallet_type', self.multisig_type)
             self.wallet = Multisig_Wallet(self.storage)
             self.wallet.add_cosigner('x1/', text, password)
-            self.run('show_xpub_and_add_cosigners', (Wallet.is_xpub(text), password,))
+            self.stack = []
+            self.run('show_xpub_and_add_cosigners', (password,))
 
-    def show_xpub_and_add_cosigners(self, is_xpub, password):
-        if not is_xpub:
-            xpub = self.wallet.master_public_keys.get('x1/')
-            self.show_xpub_dialog(run_next=lambda x: self.add_cosigners(password), xpub=xpub)
-        else:
-            self.add_cosigners(password)
+    def show_xpub_and_add_cosigners(self, password):
+        xpub = self.wallet.master_public_keys.get('x1/')
+        self.show_xpub_dialog(xpub=xpub, run_next=lambda x: self.run('add_cosigners', password))
 
     def add_cosigners(self, password):
         i = self.wallet.get_missing_cosigner()
@@ -247,10 +240,13 @@ class BaseWizard(object):
 
     def on_cosigner(self, text, password):
         i = self.wallet.get_missing_cosigner()
-        self.wallet.add_cosigner('x%d/'%i, text, password)
+        try:
+            self.wallet.add_cosigner('x%d/'%i, text, password)
+        except BaseException as e:
+            print "error:" + str(e)
         i = self.wallet.get_missing_cosigner()
         if i:
-            self.run('add_cosigners', (password,))
+            self.run('add_cosigners', password)
         else:
             self.create_addresses()
 
@@ -258,6 +254,7 @@ class BaseWizard(object):
         def task():
             self.wallet.create_main_account()
             self.wallet.synchronize()
+            self.wallet.storage.write()
             self.terminate()
         msg = _("Electrum is generating your addresses, please wait.")
         self.waiting_dialog(task, msg)
@@ -268,9 +265,8 @@ class BaseWizard(object):
         self.show_seed_dialog(run_next=self.confirm_seed, seed_text=seed)
 
     def confirm_seed(self, seed):
-        assert Wallet.is_seed(seed)
         self.confirm_seed_dialog(run_next=self.add_password, is_valid=lambda x: x==seed)
 
     def add_password(self, text):
-        f = lambda x: self.create_wallet(text, x)
+        f = lambda pw: self.run('create_wallet', text, pw)
         self.request_password(run_next=f)

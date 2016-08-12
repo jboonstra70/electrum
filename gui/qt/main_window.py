@@ -906,7 +906,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, PrintError):
 
         self.fee_slider = QSlider(Qt.Horizontal, self)
         self.fee_slider.setRange(0, 4)
-        self.fee_slider.setToolTip(_(''))
+        self.fee_slider.setToolTip('')
         def slider_moved():
             from electrum_ltc.util import fee_levels
             i = self.fee_slider.sliderPosition()
@@ -1283,9 +1283,9 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, PrintError):
                 if status:
                     if tx_desc is not None and tx.is_complete():
                         self.wallet.set_label(tx.hash(), tx_desc)
-                        parent.show_message(_('Payment sent.') + '\n' + msg)
-                        self.invoice_list.update()
-                        self.do_clear()
+                    parent.show_message(_('Payment sent.') + '\n' + msg)
+                    self.invoice_list.update()
+                    self.do_clear()
                 else:
                     parent.show_error(msg)
 

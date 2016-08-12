@@ -1,13 +1,13 @@
 [app]
 
 # (str) Title of your application
-title = Electrum-LTC
+title = Electrum
 
 # (str) Package name
-package.name = Electrum-LTC
+package.name = Electrum
 
 # (str) Package domain (needed for android/ios packaging)
-package.domain = org.electrum_ltc
+package.domain = org.electrum
 
 # (str) Source code where the main.py live
 source.dir = .
@@ -31,11 +31,11 @@ version.filename = %(source.dir)s/lib/version.py
 #version = 1.9.8
 
 # (list) Application requirements
-requirements = openssl, pil, plyer==master, kivy==master
+requirements = hostpython2, android, openssl, pycrypto, pil, plyer, kivy==master
 
 # (str) Presplash of the application
 #presplash.filename = %(source.dir)s/gui/kivy/theming/splash.png
-presplash.filename = %(source.dir)s/icons/electrum-ltc.png
+presplash.filename = %(source.dir)s/icons/electrum.png
 
 # (str) Icon of the application
 #icon.filename = %(source.dir)s/icons/electrum_android_launcher_icon.png
